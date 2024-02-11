@@ -1,27 +1,35 @@
-from sklearn import cluster
+from sklearn import metrics
+from sklearn.cluster import DBSCAN
 import os
 import json
+import PySimpleGUI as sg
 
-def k_means_clustering(data, k):
-    """Perform k-means clustering on the input data."""
-    kmeans = cluster.KMeans(n_clusters=k)
-    kmeans.fit(data)
-    return kmeans.labels_.tolist() # Convert numpy array to list
+def clustering_window():
+    layout = [
+        [sg.Text("Wähle bitte zwei Eigenschaften für die DBScan Clustering Analyse", justification="center")],
+        [sg.Column([[sg.Check('Defect Channel', key='defect_channel'), sg.Check('Distance', key='distance'), sg.Check('Magnetization', key='magnetization'), sg.Check('Timestamp', key='timestamp'), sg.Check('Velocity', key='velocity'), sg.Check('Wall Thickness', key='wall_thickness')]], justification="center")],
+        [sg.Text("Wähle bitte die Anzahl der Cluster"), sg.InputText(key='k')],
+        [sg.Text("Wähle bitte min_samples"), sg.InputText(key='min_samples')],
+        [sg.Column([[sg.Button("Submit", key='-SUBMIT-'), sg.Button("Cancel", key='-CANCEL-')]], justification="center")]
+    ]
+    return sg.Window("Clustering", layout, size=(600, 400))
 
-def dbscan_clustering(data, eps, min_samples):
-    """Perform DBSCAN clustering on the input data."""
-    dbscan = cluster.DBSCAN(eps=eps, min_samples=min_samples)
-    dbscan.fit(data)
-    return dbscan.labels_.tolist() # Convert numpy array to list
 
-json_file = "/Users/t.lukacs/Downloads/data_small/1b47d1e5-8f8d-4f52-98e8-2370a7e8d07f.json"
-k = 3
-eps = 0.5
-min_samples = 5
 
-# Load data from JSON file
-with open(json_file, 'r') as f:
-    data = json.load(f)
+def clustering():
+    window = clustering_window()
+    event, values = window.read()
+    if event == '-CANCEL-' or event == sg.WIN_CLOSED:
+        window.close()
+        return None
+    if event == '-SUBMIT-':
+        property_list=[element for element in values if values[element]==True]
+        print(property_list)
+        try:
+            k=int(values['k'])
+            min_samples=int(values['min_samples'])
+        except:
+            pass
 
-# Perform k-means clustering
-kmeans_labels = k_means_clustering(data['data'], k)
+        
+        

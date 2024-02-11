@@ -2,7 +2,7 @@ import PySimpleGUI as sg
 import os
 
 # Define the window layout
-def upload_window():
+def file_upload_window():
     layout = [
         [sg.Text("Please select a file"), sg.InputText(), sg.FileBrowse()],
         [sg.Button("Submit"), sg.Button("Cancel")],
@@ -10,7 +10,7 @@ def upload_window():
     return sg.Window("File Browser", layout)
 
 def file_upload():
-    window = upload_window()
+    window = file_upload_window()
     event, values = window.read()
     if event == "Cancel" or event == sg.WIN_CLOSED:
         window.close()
