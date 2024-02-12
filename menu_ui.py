@@ -5,6 +5,8 @@ from file_upload_ui import file_upload, folder_upload
 from data_prep import prep_file, prep_folder
 from database import connect_to_db, get_data
 from clustering import clustering
+from matplotlib import pyplot as plt
+
 
 def define_layout(data_in_collection, table_row_colors):
     # Define the table headings
@@ -16,7 +18,7 @@ def define_layout(data_in_collection, table_row_colors):
     layout = [
         [sg.Text("Willkommen zu ROSEN Clustering", justification='center', size=(40, 1), font=("Helvetica", 25))],
         [sg.Column(table_layout, justification="center",  expand_x=True, expand_y=True)],
-        [sg.Column([[sg.Button("Upload File"), sg.Button("Upload Folder"), sg.Button("Clustering"), sg.Button("Cancel")]], justification="center")],
+        [sg.Column([[sg.Button("Upload File"), sg.Button("Upload Folder"), sg.Button("Plot"), sg.Button("Cancel")]], justification="center")],
     ]
     return layout
 loop=0
@@ -24,7 +26,6 @@ row_colors = []
 selected_rows=[]
 # Event loop
 while True:
-    
     # Connect to the database
     if loop==0 :
         try:
@@ -82,8 +83,8 @@ while True:
             prep_file(file)
             continue
         else:
-            sg.popup_quick_message("Wähle bitte eine .h5 Datei aus", auto_close=True, auto_close_duration=2)
-            time.sleep(2)
+            sg.popup_quick_message("Wähle bitte eine .h5 Datei aus!", auto_close=True, auto_close_duration=2)
+            time.sleep(1)
             continue
     
     # Process a submitted folder
@@ -98,23 +99,25 @@ while True:
             prep_folder(folder)
             continue
         else:
-            sg.popup_quick_message("Wähle bitte einen Ordner aus", auto_close=True, auto_close_duration=2)
-            time.sleep(2)
+            sg.popup_quick_message("Wähle bitte einen Ordner aus!", auto_close=True, auto_close_duration=2)
+            time.sleep(1)
             continue
 
     #Start clustering
-    if event == "Clustering":
+    if event == "Plot":
         window.close()
         loop=0
         if len(selected_rows)>0:
-            asd=clustering()
-            
+            try:
+                plotting, property_list =clustering(selected_rows)
+            except:
+                pass
+            continue
         else:
-            sg.popup_quick_message("Wähle bitte mindestens eine Datei aus", auto_close=True, auto_close_duration=2)
-            time.sleep(2)
+            sg.popup_quick_message("Wähle bitte mindestens eine Datei aus!", auto_close=True, auto_close_duration=2)
+            time.sleep(1)
             continue
-        if asd==None:
-            continue
+
     loop+=1
 # Close the window
 try:
