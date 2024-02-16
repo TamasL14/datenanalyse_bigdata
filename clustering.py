@@ -39,6 +39,7 @@ def clustering(selected_rows):
                         plt.plot(punkte,'o')
                     plt.legend(property_list,loc='upper center')
                     try:
+                        plt.title(str(data_id))
                         plt.show(block=True)
                         plt.close()
                     except:

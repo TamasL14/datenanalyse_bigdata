@@ -97,15 +97,18 @@ def convert_h5_to_json(file_path):
             if i==0:
                 time=timestamp
                 timestamp=0 
-            new_json_data.append({
-                "punkt": i,
-                "defect_channel": defect_channel,
-                "distance": distance,
-                "magnetization": magnetization,
-                "timestamp": timestamp,
-                "velocity": velocity,
-                "wall_thickness": wall_thickness,
-            })
+            try:    
+                new_json_data.append({
+                    "punkt": int(i),
+                    "defect_channel": float(defect_channel),
+                    "distance": float(distance),
+                    "magnetization": float(magnetization),
+                    "timestamp": float(timestamp),
+                    "velocity": float(velocity),
+                    "wall_thickness": float(wall_thickness),
+                })
+            except:
+                print("Error at: {}".format(data_id))
             j=i+1
             if i==anz-1:
                 i+=1
@@ -132,22 +135,25 @@ def convert_h5_to_json(file_path):
                 distance=int.from_bytes(distance)
                 velocity=(distance*1000)/timestamp
 
-            new_json_data.append({
-                "punkt": i,
-                "defect_channel": defect_channel,
-                "distance": distance,
-                "magnetization": magnetization,
-                "timestamp": timestamp,
-                "velocity": velocity,
-                "wall_thickness": wall_thickness,
-            })
+            try:    
+                new_json_data.append({
+                    "punkt": int(i),
+                    "defect_channel": float(defect_channel),
+                    "distance": float(distance),
+                    "magnetization": float(magnetization),
+                    "timestamp": float(timestamp),
+                    "velocity": float(velocity),
+                    "wall_thickness": float(wall_thickness),
+                })
+            except:
+                print("Error at: {}".format(data_id))
             i+=1
 
         json_data['data'] = new_json_data
-        filename = data_id+ ".json"
+        """filename = data_id+ ".json"
         json_file_path = "/Users/t.lukacs/Downloads/data_small/{}".format(filename)
         with open(json_file_path, 'w') as f:
-            json.dump(json_data, f, cls=CustomEncoder)
+            json.dump(json_data, f, cls=CustomEncoder)"""
         return data_id, json_data
 
 def prep_file(file):
