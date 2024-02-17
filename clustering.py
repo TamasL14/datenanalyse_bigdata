@@ -1,12 +1,10 @@
-from sklearn import metrics
-from sklearn.cluster import DBSCAN
-import os
-import json
+# Dieses Modul öffnet das Fenster für die Clustering Analyse
+# Import Bibliotheken
 import PySimpleGUI as sg
 from database import get_data_property
 from matplotlib import pyplot as plt
-import numpy as np
 
+# Definition des Clustering Fensters
 def clustering_window():
     layout = [
         [sg.Text("Wähle bitte zwei Eigenschaften für die DBScan Clustering Analyse", justification="center")],
@@ -15,43 +13,44 @@ def clustering_window():
         [sg.Text("Wähle bitte min_samples",visible=False), sg.InputText(key='min_samples',visible=False)],
         [sg.Column([[sg.Button("Submit", key='-SUBMIT-'), sg.Button("Cancel", key='-CANCEL-')]], justification="center")],
     ]
+    # Fenster erstellen
     return sg.Window("Clustering", layout, size=(600, 400))
 
+# Funktion zum Öffnen des Clustering Fensters
 def clustering(selected_rows):
     while True:
-        window = clustering_window()
-        event, values = window.read()
-        if event == '-CANCEL-' or event == sg.WIN_CLOSED:
-            window.close()
+        window = clustering_window() # Öffnen des Clustering Fensters
+        event, values = window.read() # Benutzerinteraktion mit dem Fenster lesen
+        # Wenn das Fenster geschlossen wird oder der "Cancel" Button gedrückt wird
+        if event == '-CANCEL-' or event == sg.WIN_CLOSED: 
+            window.close() # Fenster schließen
             break
+
+        # Wenn der "Submit" Button gedrückt wird
         if event == '-SUBMIT-':
+
+            # Variablen initialisieren
             punkte=[]
             plotting={}
-            property_list=[element for element in values if values[element]==True]
+            property_list=[element for element in values if values[element]==True] # Ausgewählte Eigenschaften in einer Liste speichern
             
-            if len(property_list)>0:
-                for data_id in selected_rows:
-                    punkte=get_data_property(data_id, property_list)
-                    plotting[data_id]=punkte
+            
+            if len(property_list)>0: # Überprüfen, ob mindestens eine Eigenschaft ausgewählt wurde
+                for data_id in selected_rows: # Für jede ausgewählte Zeile
+                    punkte=get_data_property(data_id, property_list) # Datenpunkte aus der Datenbank holen
+                    plotting[data_id]=punkte # Datenpunkte in ein Dictionary speichern
 
-                for data_id in plotting:
-                    for punkte in plotting[data_id]:
-                        plt.plot(punkte,'o')
-                    plt.legend(property_list,loc='upper center')
+                for data_id in plotting: # Für jede ausgewählte Zeile
+                    for punkte in plotting[data_id]: # Für jeden Datenpunkt
+                        plt.plot(punkte,'o') # Datenpunkte plotten
+                    plt.legend(property_list,loc='upper center') # Legende hinzufügen
                     try:
-                        plt.show(block=True)
-                        plt.close()
+                        plt.show(block=True) # Plot anzeigen
+                        plt.close() # Plot schließen
                     except:
                         pass
-        continue
-    return plotting, property_list 
-    
-
-    """        try:
-                k=int(values['k'])
-                min_samples=int(values['min_samples'])
-            except:
-                pass"""
-
+            else:
+                # Fehlermeldung, wenn keine Eigenschaft ausgewählt wurde
+                sg.popup_quick_message("Please select at least one property", auto_close=True, auto_close_duration=2)
         
-        
+        continue # Nächste Benutzerinteraktion lesen
