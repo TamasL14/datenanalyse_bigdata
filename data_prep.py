@@ -126,7 +126,7 @@ def convert_h5_to_json(file_path):
                 "wall_thickness": wall_thickness,
             })
 
-            j=i+ # Zähler für die zweite schleife updaten
+            j=i+1 # Zähler für die zweite schleife updaten
 
             # Wenn die Schleife bei dem Anzahl der nicht vollständige Datensätze angekommen ist, wird die Schleife beendet
             if i==anz-1:
