@@ -105,6 +105,8 @@ def convert_h5_to_json(file_path):
             if i==0:
                 time=timestamp
                 timestamp=0 
+
+            # Datensätze in die Liste einfügen
             new_json_data.append({
                 "punkt": i,
                 "defect_channel": defect_channel,
@@ -115,6 +117,8 @@ def convert_h5_to_json(file_path):
                 "wall_thickness": wall_thickness,
             })
             j=i+1
+
+            # Wenn die Anzahl der Datensätze die Anzahl von dem nicht vollständigen Datensatz erreicht, wird der Loop abgebrochen
             if i==anz-1:
                 i+=1
                 break
@@ -153,7 +157,7 @@ def convert_h5_to_json(file_path):
                     velocity=(distance*1000)/timestamp
                 else:
                     velocity=0
-
+            # Datensätze in die Liste einfügen
             new_json_data.append({
                 "punkt": i,
                 "defect_channel": defect_channel,
@@ -163,13 +167,9 @@ def convert_h5_to_json(file_path):
                 "velocity": velocity,
                 "wall_thickness": wall_thickness,
             })
-            i+=1
+            i+=1 # Zahl der punkt erhöhen
 
-        json_data['data'] = new_json_data
-        filename = data_id+ ".json"
-        json_file_path = "/Users/t.lukacs/Downloads/data_small/{}".format(filename)
-        with open(json_file_path, 'w') as f:
-            json.dump(json_data, f, cls=CustomEncoder)
+        json_data['data'] = new_json_data # Datensätze in das JSON-Objekt einfügen
         return data_id, json_data
 
 def prep_file(file):
