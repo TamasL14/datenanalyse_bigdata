@@ -103,19 +103,8 @@ def convert_h5_to_json(file_path):
 
             # Wenn der Loop zum ersten Mal durchläuft, wird der Wert von timestamp in der Variable time gespeichert und Timestamp auf 0 gesetzt
             if i==0:
-                time=timestamp  
-                timestamp=0   
-
-            # Versuche Zietpunkt des Datensatzes zu berechnen
-            try:
-                timestamp=timestamp-time
-            except:
-                # Wenn der Timestamp ein String ist, wird er in ein datetime-Objekt umgewandelt und dann in einen Timestamp
-                timestamp = datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S")
-                timestamp=timestamp.timestamp()
-                timestamp=timestamp-time # Zeitpunkt des Datensatzes berechnen
-            
-            # Datensätze in der Dictionary einfügen
+                time=timestamp
+                timestamp=0 
             new_json_data.append({
                 "punkt": i,
                 "defect_channel": defect_channel,
@@ -125,10 +114,7 @@ def convert_h5_to_json(file_path):
                 "velocity": velocity,
                 "wall_thickness": wall_thickness,
             })
-
-            j=i+1 # Zähler für die zweite schleife updaten
-
-            # Wenn die Schleife bei dem Anzahl der nicht vollständige Datensätze angekommen ist, wird die Schleife beendet
+            j=i+1
             if i==anz-1:
                 i+=1
                 break
@@ -168,28 +154,24 @@ def convert_h5_to_json(file_path):
                 else:
                     velocity=0
 
-                # Datensätze in der Dictionary einfügen
-                new_json_data.append({
-                    "punkt": i,
-                    "defect_channel": defect_channel,
-                    "distance": distance,
-                    "magnetization": magnetization,
-                    "timestamp": timestamp,
-                    "velocity": velocity,
-                    "wall_thickness": wall_thickness,
-                })
+            new_json_data.append({
+                "punkt": i,
+                "defect_channel": defect_channel,
+                "distance": distance,
+                "magnetization": magnetization,
+                "timestamp": timestamp,
+                "velocity": velocity,
+                "wall_thickness": wall_thickness,
+            })
+            i+=1
 
-                i+=1 # Zähler erhöhen
-        json_data['data'] = new_json_data # Datensätze in das JSON-Objekt einfügen
+        json_data['data'] = new_json_data
+        filename = data_id+ ".json"
+        json_file_path = "/Users/t.lukacs/Downloads/data_small/{}".format(filename)
+        with open(json_file_path, 'w') as f:
+            json.dump(json_data, f, cls=CustomEncoder)
+        return data_id, json_data
 
-        # JSON File für Testzwecke speichern
-        #filename = data_id+ ".json"
-        #json_file_path = "/Users/t.lukacs/Downloads/data_small/{}".format(filename)
-        #with open(json_file_path, 'w') as f:
-        #    json.dump(json_data, f)
-        return data_id, json_data # Rückgabe der data_id und des JSON-Objekts
-
-# Funktion um die .h5-Dateien in .json-Dateien umzuwandeln
 def prep_file(file):
         data_id,json_data = convert_h5_to_json(file)      
         upload_file(data_id, json_data) # Die Funktion upload_file() aus der Datei database.py wird aufgerufen und dabei die JSON-Datei in die Datenbank hochgeladen
