@@ -37,7 +37,16 @@ def upload_file(data_id, json_data):
 
 # Funktion um die Daten aus der Datenbank herunterzuladen
 def get_data():
-    data_in_collection = [str(id) for id in collection.distinct('_id')] # IDs von allen Daten in der Collection holen
+    projection = {"_id": 1, "DATASET.attributes.id": 1, "DATASET.attributes.datum": 1, "DATASET.attributes.configuration": 1, "DATASET.attributes.instrument": 1}
+    data = list(collection.find({}, projection))
+    data_in_collection = []
+    for i, document in enumerate(data):
+        data_id = document["_id"]
+        datum = document["DATASET"]["attributes"].get("datum", "")
+        kontinent = document["DATASET"]["attributes"]["configuration"]
+        instrument = document["DATASET"]["attributes"]["instrument"]
+        data_in_collection.append([i+1, str(data_id), datum, kontinent, instrument])
+
     return data_in_collection
 
 # Funktion um die Datensätze aus der Datenbank herunterzuladen

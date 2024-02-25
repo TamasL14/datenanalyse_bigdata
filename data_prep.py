@@ -61,8 +61,6 @@ def convert_h5_to_json(file_path):
                 data_id = attr_value # data_id speichern
                 data_id = data_id.replace("-", "") # data_id in einen String ohne Zusatzzeichen umwandeln
 
-        json_data['attributes'] = group_attributes # Attribute in das JSON-Objekt einfügen
-
         # Dictionary für die Datensätze erstellen
         dataset={}
         anz=1000
@@ -97,7 +95,13 @@ def convert_h5_to_json(file_path):
             # Versuch, den Timestamp zu dekodieren und in einen float umzuwandeln
             try:
                 timestamp=timestamp.decode()
-                timestamp=float(timestamp)
+            except:
+                pass
+
+            # Wenn der Timestamp ein String ist, wird er in ein datetime-Objekt umgewandelt und dann in einen Timestamp
+            try:
+                timestamp = datetime.strptime(str(timestamp), "%Y-%m-%dT%H:%M:%S")
+                timestamp=timestamp.timestamp()
             except:
                 pass
 
@@ -105,6 +109,10 @@ def convert_h5_to_json(file_path):
             if i==0:
                 time=timestamp
                 timestamp=0 
+
+            # Versuche Zietpunkt des Datensatzes zu berechnen
+            if timestamp!=0:
+                    timestamp=float(timestamp)-float(time) # Zeitpunkt des Datensatzes berechnen
 
             # Datensätze in die Liste einfügen
             new_json_data.append({
@@ -134,7 +142,12 @@ def convert_h5_to_json(file_path):
                 # Versuch, den Timestamp zu dekodieren und in einen float umzuwandeln
                 try:
                     timestamp=timestamp.decode()
-                    timestamp=float(timestamp)
+                except:
+                    pass
+                
+                try:
+                    timestamp = datetime.strptime(str(timestamp), "%Y-%m-%dT%H:%M:%S")
+                    timestamp=timestamp.timestamp()
                 except:
                     pass
 
@@ -144,17 +157,16 @@ def convert_h5_to_json(file_path):
                     timestamp=0 
 
                 # Versuche Zietpunkt des Datensatzes zu berechnen
-                try:
-                    timestamp=timestamp-time
-                except:
-                    # Wenn der Timestamp ein String ist, wird er in ein datetime-Objekt umgewandelt und dann in einen Timestamp
-                    timestamp = datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S")
-                    timestamp=timestamp.timestamp() 
-                    timestamp=timestamp-time # Zeitpunkt des Datensatzes berechnen
+                if timestamp!=0:
+                        timestamp=float(timestamp)-float(time) # Zeitpunkt des Datensatzes berechnen
 
                 # Fehlende Werte für die Geschwindigkeit berechnen
                 if timestamp!=0:
-                    velocity=(distance*1000)/timestamp
+                    try:
+                        velocity=(int(distance)*1000)/float(timestamp)
+                    except:
+                        distance=int.from_bytes(distance)
+                        velocity=(int(distance)*1000)/float(timestamp)
                 else:
                     velocity=0
             # Datensätze in die Liste einfügen
@@ -168,7 +180,9 @@ def convert_h5_to_json(file_path):
                 "wall_thickness": wall_thickness,
             })
             i+=1 # Zahl der punkt erhöhen
-
+            
+        group_attributes['datum']=datetime.utcfromtimestamp(float(time)).strftime('%Y-%m-%d') # Datum des Datensatzes als Attribute hinzufügen
+        json_data['attributes'] = group_attributes # Attribute in das JSON-Objekt einfügen
         json_data['data'] = new_json_data # Datensätze in das JSON-Objekt einfügen
         return data_id, json_data
 
@@ -177,8 +191,11 @@ def prep_file(file):
         upload_file(data_id, json_data) # Die Funktion upload_file() aus der Datei database.py wird aufgerufen und dabei die JSON-Datei in die Datenbank hochgeladen
 
 # Funktion um die .h5-Dateien aus einem Ordner in .json-Dateien umzuwandeln
-def prep_folder(folder):          
+def prep_folder(folder):
+    i=1          
     for file in os.listdir(folder): # Alle Dateien im Ordner durchsuchen
+        print(i)
+        i+=1
         # Wenn die Datei eine .h5 Datei ist, wird die Funktion convert_h5_to_json() aufgerufen
         if file.endswith(".h5"):            
             full_file_path = os.path.join(folder, file) # Deteiverzeichnis und Dateiname zusammenfügen           
