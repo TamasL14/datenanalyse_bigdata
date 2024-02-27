@@ -165,11 +165,8 @@ while True:
         loop=0
         # Prüfen, ob mindestens eine Datei aus der Tabelle ausgewählt wurde
         if len(selected_rows)>0:
-            try:
-                # Die Funktion clustering() aus der Datei clustering.py wird aufgerufen
-                clustering(selected_rows)
-            except:
-                pass
+            # Die Funktion clustering() aus der Datei clustering.py wird aufgerufen
+            clustering(selected_rows)
             continue
         else:
             # Fehlermeldung, wenn keine Datei ausgewählt wurde
