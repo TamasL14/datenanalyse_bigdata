@@ -13,6 +13,7 @@ import base64
 import numpy as np
 import os
 from sklearn.linear_model import LinearRegression
+import re
 from itertools import islice
 from datetime import datetime
 
@@ -104,15 +105,44 @@ def convert_h5_to_json(file_path):
         time=0
         j=0
         i=0
+        avg_distance=0
+        avg_magnetization=0
+        avg_velocity=0
+        avg_wall_thickness=0
+
         # Datensätze in ein neues Dictionary umwandeln
         for i, (defect_channel,distance, magnetization,timestamp,velocity,wall_thickness) in \
             enumerate(zip(dataset['defect_channel'], dataset['distance'], dataset['magnetization'], \
                           dataset['timestamp'], dataset['velocity'], dataset['wall_thickness'])):
             
             # Wenn der Datensatz Bytes enthält, wird die Funktion convert_dataset_bytes_to_json() aufgerufen, um den Datensatz in einen encodierten JSON-String umzuwandeln
-            if type(distance)==bytes:
-                distance=int.from_bytes(distance)
-            
+            try:
+                if type(distance)==bytes:
+                    distance=int.from_bytes(distance)
+            except:
+                pass
+
+            # Wenn der Datensatz Eastereggs enthält, werden die Werte durch den Durchschnitt ersetzt
+            try:
+                if re.search(r'Easter', distance):
+                    distance=avg_distance
+                if re.search(r'Easter', magnetization):
+                    magnetization=avg_magnetization
+                if re.search(r'Easter', velocity):
+                    velocity=avg_velocity
+                if re.search(r'Easter', wall_thickness):
+                    wall_thickness=avg_wall_thickness
+            except:
+                pass
+            # Durchschnitt der Werte berechnen
+            try:
+                avg_distance=(avg_distance+int(distance))/i
+                avg_magnetization=(avg_magnetization+int(magnetization))/i
+                avg_velocity=(avg_velocity+int(velocity))/i
+                avg_wall_thickness=(avg_wall_thickness+int(wall_thickness))/i
+            except:
+                pass
+
             # Versuch, den Timestamp zu dekodieren und in einen float umzuwandeln
             try:
                 timestamp=timestamp.decode()
@@ -145,11 +175,11 @@ def convert_h5_to_json(file_path):
                 "velocity": velocity,
                 "wall_thickness": wall_thickness,
             })
-            j=i+1
 
             # Wenn die Anzahl der Datensätze die Anzahl von dem nicht vollständigen Datensatz erreicht, wird der Loop abgebrochen
             if i==anz-1:
                 i+=1
+                j=i
                 break
 
         if anz!=1000: # Wenn die Anzahl der Datensätze nicht 1000 beträgt, werden die fehlenden Datensätze ausgerechnet und in die Liste eingefügt
@@ -159,6 +189,27 @@ def convert_h5_to_json(file_path):
                 # Wenn der Datensatz Bytes enthält, wird die Funktion convert_dataset_bytes_to_json() aufgerufen, um den Datensatz in einen encodierten JSON-String umzuwandeln
                 if type(distance)==bytes:
                     distance=int.from_bytes(distance)
+
+                # Wenn der Datensatz Eastereggs enthält, werden die Werte durch den Durchschnitt ersetzt
+                try:
+                    if re.search(r'Easter', distance):
+                        distance=avg_distance
+                    if re.search(r'Easter', magnetization):
+                        magnetization=avg_magnetization
+                    if re.search(r'Easter', velocity):
+                        velocity=avg_velocity
+                    if re.search(r'Easter', wall_thickness):
+                        wall_thickness=avg_wall_thickness
+                except:
+                    pass
+                # Durchschnitt der Werte berechnen
+                try:
+                    avg_distance=(avg_distance+int(distance))/i
+                    avg_magnetization=(avg_magnetization+int(magnetization))/i
+                    avg_velocity=(avg_velocity+int(velocity))/i
+                    avg_wall_thickness=(avg_wall_thickness+int(wall_thickness))/i
+                except:
+                    pass
 
                 # Versuch, den Timestamp zu dekodieren und in einen float umzuwandeln
                 try:
