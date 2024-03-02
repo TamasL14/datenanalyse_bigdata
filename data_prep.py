@@ -12,23 +12,11 @@ import json
 import base64
 import numpy as np
 import os
-from sklearn.linear_model import LinearRegression
 from itertools import islice
 from datetime import datetime
 
 # Import Funktionen aus anderen Modulen
 from database import upload_file
-
-def linear_regression_detrend(data):
-    n = len(data)
-    X = np.arange(n).reshape(-1, 1)
-    y = np.array(data)
-    model = LinearRegression()
-    model.fit(X, y)
-    trend = model.predict(X)
-    notadjusted = y - trend
-    adjustement = data[0] - notadjusted[0]
-    return y - trend + adjustement
 
 # Funktion um die Datensätze in eine Liste umzuwandeln
 def convert_dataset_to_list(dataset):
@@ -59,9 +47,7 @@ def convert_h5_to_json(file_path):
                 # Fehlermeldung, wenn die Gruppe "data" oder "Daten" nicht in der Datei vorhanden ist
                 print("Error missing Daten in dataset: {}".format(file_path))
                 return 0
-        # Kompensation der Magnetisierung
-  
-
+            
         # JSON-Objekt erstellen
         json_data = {}
 
@@ -91,9 +77,7 @@ def convert_h5_to_json(file_path):
                 if  int(obj.shape[0]) != 1000:
                     anz=int(obj.shape[0])
                 dataset[name] = convert_dataset_to_list(obj)
-        
-        magnetization_values = np.array(dataset['magnetization'])
-        compensated_magnetization = linear_regression_detrend(magnetization_values)  
+            
         # Variable für die neuen Datensätze erstellen
         new_json_data = []
         time=0
@@ -129,14 +113,13 @@ def convert_h5_to_json(file_path):
             # Versuche Zietpunkt des Datensatzes zu berechnen
             if timestamp!=0:
                     timestamp=float(timestamp)-float(time) # Zeitpunkt des Datensatzes berechnen
-            
 
             # Datensätze in die Liste einfügen
             new_json_data.append({
                 "punkt": i,
                 "defect_channel": defect_channel,
                 "distance": distance,
-                "magnetization": compensated_magnetization[i],
+                "magnetization": magnetization,
                 "timestamp": timestamp,
                 "velocity": velocity,
                 "wall_thickness": wall_thickness,
@@ -197,7 +180,7 @@ def convert_h5_to_json(file_path):
                 "wall_thickness": wall_thickness,
             })
             i+=1 # Zahl der punkt erhöhen
-   
+            
         group_attributes['datum']=datetime.utcfromtimestamp(float(time)).strftime('%Y-%m-%d') # Datum des Datensatzes als Attribute hinzufügen
         json_data['attributes'] = group_attributes # Attribute in das JSON-Objekt einfügen
         json_data['data'] = new_json_data # Datensätze in das JSON-Objekt einfügen
