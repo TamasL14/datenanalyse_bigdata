@@ -30,7 +30,7 @@ def convert_dataset_bytes_to_json(dataset):
     encoded_data = base64.b64encode(data)
     base64_str = f'data:application/octet-stream;base64,{encoded_data.decode("utf-8")}'
     return base64_str
-
+#Applies linear regression to detrend the given data.
 def linear_regression_detrend(data):
     n = len(data)
     X = np.arange(n).reshape(-1, 1)
@@ -90,11 +90,14 @@ def convert_h5_to_json(file_path):
                     anz=int(obj.shape[0])
                 dataset[name] = convert_dataset_to_list(obj)        
                 
+        # Try to perform linear regression detrend on the 'magnetization' dataset
         try:
             magnetization_values = np.array(dataset['magnetization'])
             compensated_magnetization = linear_regression_detrend(magnetization_values)  
         except:
+            # If an error occurs during linear regression, use the original 'magnetization' dataset
             compensated_magnetization = dataset['magnetization']
+            print("Error in linear regression {}".format(file_path))
             
         # Variable für die neuen Datensätze erstellen
         new_json_data = []
