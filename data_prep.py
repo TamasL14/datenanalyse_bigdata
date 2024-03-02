@@ -90,8 +90,8 @@ def convert_h5_to_json(file_path):
                 if  int(obj.shape[0]) != 1000:
                     anz=int(obj.shape[0])
                 dataset[name] = convert_dataset_to_list(obj)        
-                
-        # Try to perform linear regression detrend on the 'magnetization' dataset
+        """"        
+         # Try to perform linear regression detrend on the 'magnetization' dataset
         try:
             magnetization_values = np.array(dataset['magnetization'])
             compensated_magnetization = linear_regression_detrend(magnetization_values)  
@@ -99,7 +99,7 @@ def convert_h5_to_json(file_path):
             # If an error occurs during linear regression, use the original 'magnetization' dataset
             compensated_magnetization = dataset['magnetization']
             print("Error in linear regression {}".format(file_path))
-            
+        """
         # Variable für die neuen Datensätze erstellen
         new_json_data = []
         time=0
@@ -170,7 +170,8 @@ def convert_h5_to_json(file_path):
                 "punkt": i,
                 "defect_channel": defect_channel,
                 "distance": distance,
-                "magnetization": compensated_magnetization[i],
+                "magnetization": magnetization,
+                #"magnetization": compensated_magnetization[i],                
                 "timestamp": timestamp,
                 "velocity": velocity,
                 "wall_thickness": wall_thickness,
@@ -210,7 +211,7 @@ def convert_h5_to_json(file_path):
                     avg_wall_thickness=(avg_wall_thickness+int(wall_thickness))/i
                 except:
                     pass
-
+                
                 # Versuch, den Timestamp zu dekodieren und in einen float umzuwandeln
                 try:
                     timestamp=timestamp.decode()
@@ -247,12 +248,33 @@ def convert_h5_to_json(file_path):
                 "defect_channel": defect_channel,
                 "distance": distance,
                 "magnetization": magnetization,
+                #"magnetization": compensated_magnetization[i],
                 "timestamp": timestamp,
                 "velocity": velocity,
                 "wall_thickness": wall_thickness,
             })
-            i+=1 # Zahl der punkt erhöhen
-            
+             # Zahl der punkt erhöhen
+        
+        try:
+            magnetization_values = np.array([item['magnetization'] for item in new_json_data])            
+            compensated_magnetization = linear_regression_detrend(magnetization_values)  
+        except:
+            # If an error occurs during linear regression, use the original 'magnetization' dataset
+            compensated_magnetization = dataset['magnetization']
+            print("Error in linear regression {}".format(file_path))
+        
+        for (defect_channel,distance, magnetization,timestamp,wall_thickness) in \
+            islice(zip(dataset['defect_channel'], dataset['distance'], dataset['magnetization'], dataset['timestamp'], dataset['wall_thickness']),j,None):
+                new_json_data.append({
+                    "punkt": i,
+                    "defect_channel": defect_channel,
+                    "distance": distance,
+                    "magnetization": compensated_magnetization[i],
+                    "timestamp": timestamp,
+                    "velocity": velocity,
+                    "wall_thickness": wall_thickness,
+            })       
+        
         group_attributes['datum']=datetime.utcfromtimestamp(float(time)).strftime('%Y-%m-%d') # Datum des Datensatzes als Attribute hinzufügen
         json_data['attributes'] = group_attributes # Attribute in das JSON-Objekt einfügen
         json_data['data'] = new_json_data # Datensätze in das JSON-Objekt einfügen
