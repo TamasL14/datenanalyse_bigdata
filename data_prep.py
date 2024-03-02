@@ -12,6 +12,7 @@ import json
 import base64
 import numpy as np
 import os
+from sklearn.linear_model import LinearRegression
 import re
 from itertools import islice
 from datetime import datetime
@@ -30,6 +31,17 @@ def convert_dataset_bytes_to_json(dataset):
     encoded_data = base64.b64encode(data)
     base64_str = f'data:application/octet-stream;base64,{encoded_data.decode("utf-8")}'
     return base64_str
+
+def linear_regression_detrend(data):
+    n = len(data)
+    X = np.arange(n).reshape(-1, 1)
+    y = np.array(data)
+    model = LinearRegression()
+    model.fit(X, y)
+    trend = model.predict(X)
+    notadjusted = y - trend
+    adjustement = data[0] - notadjusted[0]
+    return y - trend + adjustement
 
 # Funktion um die .h5-Dateien in .json-Dateien umzuwandeln
 def convert_h5_to_json(file_path):
@@ -77,7 +89,13 @@ def convert_h5_to_json(file_path):
                 # Wenn der Datensatz keine 1000 Punkte enthält, wird die Anzahl der Punkte in der Variable anz gespeichert
                 if  int(obj.shape[0]) != 1000:
                     anz=int(obj.shape[0])
-                dataset[name] = convert_dataset_to_list(obj)
+                dataset[name] = convert_dataset_to_list(obj)        
+                
+        try:
+            magnetization_values = np.array(dataset['magnetization'])
+            compensated_magnetization = linear_regression_detrend(magnetization_values)  
+        except:
+            compensated_magnetization = dataset['magnetization']
             
         # Variable für die neuen Datensätze erstellen
         new_json_data = []
@@ -149,7 +167,7 @@ def convert_h5_to_json(file_path):
                 "punkt": i,
                 "defect_channel": defect_channel,
                 "distance": distance,
-                "magnetization": magnetization,
+                "magnetization": compensated_magnetization[i],
                 "timestamp": timestamp,
                 "velocity": velocity,
                 "wall_thickness": wall_thickness,
