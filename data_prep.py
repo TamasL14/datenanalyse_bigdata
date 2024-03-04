@@ -255,26 +255,20 @@ def convert_h5_to_json(file_path):
             })
              # Zahl der punkt erhöhen
         
+        magnetization_values = [data_point['magnetization'] for data_point in new_json_data]
+
         try:
-            magnetization_values = np.array([item['magnetization'] for item in new_json_data])            
-            compensated_magnetization = linear_regression_detrend(magnetization_values)  
+            # Anwendung der linearen Regression Detrending
+            compensated_magnetization = linear_regression_detrend(magnetization_values)
+
+            # Aktualisieren der Magnetisierungswerte in new_json_data
+            for i, item in enumerate(new_json_data):
+                item['magnetization'] = compensated_magnetization[i]
         except:
             # If an error occurs during linear regression, use the original 'magnetization' dataset
             compensated_magnetization = dataset['magnetization']
             print("Error in linear regression {}".format(file_path))
-        
-        for (defect_channel,distance, magnetization,timestamp,wall_thickness) in \
-            islice(zip(dataset['defect_channel'], dataset['distance'], dataset['magnetization'], dataset['timestamp'], dataset['wall_thickness']),j,None):
-                new_json_data.append({
-                    "punkt": i,
-                    "defect_channel": defect_channel,
-                    "distance": distance,
-                    "magnetization": compensated_magnetization[i],
-                    "timestamp": timestamp,
-                    "velocity": velocity,
-                    "wall_thickness": wall_thickness,
-            })       
-        
+
         group_attributes['datum']=datetime.utcfromtimestamp(float(time)).strftime('%Y-%m-%d') # Datum des Datensatzes als Attribute hinzufügen
         json_data['attributes'] = group_attributes # Attribute in das JSON-Objekt einfügen
         json_data['data'] = new_json_data # Datensätze in das JSON-Objekt einfügen
