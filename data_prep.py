@@ -31,16 +31,22 @@ def convert_dataset_bytes_to_json(dataset):
     encoded_data = base64.b64encode(data)
     base64_str = f'data:application/octet-stream;base64,{encoded_data.decode("utf-8")}'
     return base64_str
+
 #Applies linear regression to detrend the given data.
 def linear_regression_detrend(data):
     n = len(data)
     X = np.arange(n).reshape(-1, 1)
     y = np.array(data)
+    y = np.where(y < 0, y * -1, y)
     model = LinearRegression()
     model.fit(X, y)
     trend = model.predict(X)
     notadjusted = y - trend
-    adjustement = data[0] - notadjusted[0]
+    original_start_value_avg = np.mean(data[:5])
+    if original_start_value_avg < 0:
+        adjustement = (original_start_value_avg * -1) + notadjusted[0]
+    else:
+        adjustement = original_start_value_avg - notadjusted[0]
     return y - trend + adjustement
 
 # Funktion um die .h5-Dateien in .json-Dateien umzuwandeln
