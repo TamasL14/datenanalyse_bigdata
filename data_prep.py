@@ -90,16 +90,7 @@ def convert_h5_to_json(file_path):
                 if  int(obj.shape[0]) != 1000:
                     anz=int(obj.shape[0])
                 dataset[name] = convert_dataset_to_list(obj)        
-                
-        # Try to perform linear regression detrend on the 'magnetization' dataset
-        try:
-            magnetization_values = np.array(dataset['magnetization'])
-            compensated_magnetization = linear_regression_detrend(magnetization_values)  
-        except:
-            # If an error occurs during linear regression, use the original 'magnetization' dataset
-            compensated_magnetization = dataset['magnetization']
-            print("Error in linear regression {}".format(file_path))
-            
+
         # Variable für die neuen Datensätze erstellen
         new_json_data = []
         time=0
@@ -170,7 +161,7 @@ def convert_h5_to_json(file_path):
                 "punkt": i,
                 "defect_channel": defect_channel,
                 "distance": distance,
-                "magnetization": compensated_magnetization[i],
+                "magnetization": magnetization,
                 "timestamp": timestamp,
                 "velocity": velocity,
                 "wall_thickness": wall_thickness,
@@ -253,6 +244,21 @@ def convert_h5_to_json(file_path):
             })
             i+=1 # Zahl der punkt erhöhen
             
+
+        magnetization_values = [data_point['magnetization'] for data_point in new_json_data]
+
+        try:
+            # Anwendung der linearen Regression Detrending
+            compensated_magnetization = linear_regression_detrend(magnetization_values)
+
+            # Aktualisieren der Magnetisierungswerte in new_json_data
+            for i, item in enumerate(new_json_data):
+                item['magnetization'] = compensated_magnetization[i]
+        except:
+            # If an error occurs during linear regression, use the original 'magnetization' dataset
+            compensated_magnetization = dataset['magnetization']
+            print("Error in linear regression {}".format(file_path))
+
         group_attributes['datum']=datetime.utcfromtimestamp(float(time)).strftime('%Y-%m-%d') # Datum des Datensatzes als Attribute hinzufügen
         json_data['attributes'] = group_attributes # Attribute in das JSON-Objekt einfügen
         json_data['data'] = new_json_data # Datensätze in das JSON-Objekt einfügen
