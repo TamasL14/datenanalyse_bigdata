@@ -17,6 +17,7 @@ import re
 from itertools import islice
 from datetime import datetime
 import struct
+import math
 
 # Import Funktionen aus anderen Modulen
 from database import upload_file
@@ -37,12 +38,24 @@ def convert_data_types(distance, magnetization,velocity,timestamp,wall_thickness
     except (ValueError, OverflowError):
         print(distance)
     try:
+        if math.isnan(distance):
+            distance=dataset['distance'][i-1]
+            distance=float(distance.decode('utf-8'))
+    except:
+        pass
+    try:
         if isinstance(magnetization, bytes):
             try:
                 magnetization=float(magnetization.decode('utf-8'))
             except:
                 magnetization=dataset['magnetization'][i-1]
                 magnetization=float(magnetization.decode('utf-8'))
+    except:
+        pass
+    try:
+        if math.isnan(magnetization):
+            magnetization=dataset['magnetization'][i-1]
+            magnetization=float(magnetization.decode('utf-8'))
     except:
         pass
     try:
@@ -55,12 +68,24 @@ def convert_data_types(distance, magnetization,velocity,timestamp,wall_thickness
     except:
         pass
     try:
+        if math.isnan(velocity):
+            velocity=dataset['velocity'][i-1]
+            velocity=float(velocity.decode('utf-8'))
+    except:
+        pass
+    try:
         if isinstance(wall_thickness, bytes):
             try:
                 wall_thickness=float(wall_thickness.decode('utf-8'))
             except:
                 wall_thickness=dataset['wall_thickness'][i-1]
                 wall_thickness=float(wall_thickness.decode('utf-8'))
+    except:
+        pass
+    try:
+        if math.isnan(wall_thickness):
+            wall_thickness=dataset['wall_thickness'][i-1]
+            wall_thickness=float(wall_thickness.decode('utf-8'))
     except:
         pass
 
