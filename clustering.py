@@ -42,23 +42,25 @@ def clustering(selected_rows):
                         punkte = get_data_property(data_id, property_list)  # Datenpunkte aus der Datenbank holen
                         # Datenpunkte in ein Dictionary speichern
                         plotting[data_id] = punkte
+                    magnetization = []
+                    velocity = []
+                    wall_thickness = []
 
                     for data_id in plotting:  # Für jede ausgewählte Zeile
                         # Separate the data points
                         magnetization = [p[0] for p in plotting[data_id]]
-                        #velocity = [p[1] for p in plotting[data_id]]
+                        velocity = [p[1] for p in plotting[data_id]]
                         wall_thickness = [p[2] for p in plotting[data_id]]
 
                         # Normalize the velocity for color mapping
-                        #norm_velocity = (np.array(velocity) - min(velocity)) / (max(velocity) - min(velocity))
-                        #colors = plt.cm.rainbow(norm_velocity)
+                        norm_velocity = (np.array(velocity) - min(velocity)) / (max(velocity) - min(velocity))
+                        colors = plt.cm.rainbow(norm_velocity)
 
-                        # Plot with color mapping
-                        #plt.scatter(magnetization, wall_thickness, c=colors, cmap='rainbow')
-                        plt.scatter(magnetization, wall_thickness)
+                        #Plot with color mapping
+                        plt.scatter(magnetization, wall_thickness, c=colors, cmap='rainbow')
                     plt.xlabel('Magnetization')
                     plt.ylabel('Wall Thickness')
-                    #plt.colorbar(label='Velocity (normalized)')
+                    plt.colorbar(label='Velocity (normalized)')
                     plt.show()      
                                   
                 else:    
