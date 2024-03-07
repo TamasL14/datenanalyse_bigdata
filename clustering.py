@@ -3,6 +3,7 @@
 import PySimpleGUI as sg
 from database import get_data_property
 from matplotlib import pyplot as plt
+import numpy as np
 
 # Definition des Clustering Fensters
 def clustering_window():
@@ -36,19 +37,43 @@ def clustering(selected_rows):
             
             
             if len(property_list)>0: # Überprüfen, ob mindestens eine Eigenschaft ausgewählt wurde
-                for data_id in selected_rows: # Für jede ausgewählte Zeile
-                    punkte=get_data_property(data_id, property_list) # Datenpunkte aus der Datenbank holen
-                    plotting[data_id]=punkte # Datenpunkte in ein Dictionary speichern
+                if property_list == ['magnetization', 'velocity', 'wall_thickness']:
+                    for data_id in selected_rows:  # Für jede ausgewählte Zeile
+                        punkte = get_data_property(data_id, property_list)  # Datenpunkte aus der Datenbank holen
+                        # Datenpunkte in ein Dictionary speichern
+                        plotting[data_id] = punkte
 
-                for data_id in plotting: # Für jede ausgewählte Zeile
-                    for punkte in plotting[data_id]: # Für jeden Datenpunkt
-                        plt.plot(punkte,'o') # Datenpunkte plotten
-                    plt.legend(property_list,loc='upper center') # Legende hinzufügen
-                    try:
-                        plt.show(block=True) # Plot anzeigen
-                        plt.close() # Plot schließen
-                    except:
-                        pass
+                    for data_id in plotting:  # Für jede ausgewählte Zeile
+                        # Separate the data points
+                        magnetization = [p[0] for p in plotting[data_id]]
+                        #velocity = [p[1] for p in plotting[data_id]]
+                        wall_thickness = [p[2] for p in plotting[data_id]]
+
+                        # Normalize the velocity for color mapping
+                        #norm_velocity = (np.array(velocity) - min(velocity)) / (max(velocity) - min(velocity))
+                        #colors = plt.cm.rainbow(norm_velocity)
+
+                        # Plot with color mapping
+                        #plt.scatter(magnetization, wall_thickness, c=colors, cmap='rainbow')
+                        plt.scatter(magnetization, wall_thickness)
+                    plt.xlabel('Magnetization')
+                    plt.ylabel('Wall Thickness')
+                    #plt.colorbar(label='Velocity (normalized)')
+                    plt.show()      
+                                  
+                else:    
+                    for data_id in selected_rows: # Für jede ausgewählte Zeile
+                        punkte=get_data_property(data_id, property_list) # Datenpunkte aus der Datenbank holen
+                        plotting[data_id]=punkte # Datenpunkte in ein Dictionary speichern
+                    for data_id in plotting: # Für jede ausgewählte Zeile
+                        for punkte  in plotting[data_id]: # Für jeden Datenpunkt
+                            plt.plot(punkte,'o') # Datenpunkte plotten
+                        plt.legend(property_list,loc='upper center') # Legende hinzufügen
+                        try:
+                            plt.show(block=True) # Plot anzeigen
+                            plt.close() # Plot schließen
+                        except:
+                            pass
             else:
                 # Fehlermeldung, wenn keine Eigenschaft ausgewählt wurde
                 sg.popup_quick_message("Please select at least one property", auto_close=True, auto_close_duration=2)
