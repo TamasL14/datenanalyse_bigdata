@@ -33,22 +33,46 @@ def clustering(selected_rows):
             punkte=[]
             plotting={}
             property_list=[element for element in values if values[element]==True] # Ausgewählte Eigenschaften in einer Liste speichern
-            
+            magnetization = []
+            wall_thickness = []
+            velocity = []
             
             if len(property_list)>0: # Überprüfen, ob mindestens eine Eigenschaft ausgewählt wurde
                 for data_id in selected_rows: # Für jede ausgewählte Zeile
                     punkte=get_data_property(data_id, property_list) # Datenpunkte aus der Datenbank holen
                     plotting[data_id]=punkte # Datenpunkte in ein Dictionary speichern
 
-                for data_id in plotting: # Für jede ausgewählte Zeile
-                    for punkte in plotting[data_id]: # Für jeden Datenpunkt
-                        plt.plot(punkte,'o') # Datenpunkte plotten
-                    plt.legend(property_list,loc='upper center') # Legende hinzufügen
+                if set(property_list) == {'magnetization', 'velocity', 'wall_thickness'}:
+                    for data_id in plotting: 
+                        # Assuming data structure: [[magnetization], [velocity], [wall_thickness]]
+                        magnetization.extend(plotting[data_id][property_list.index('magnetization')])
+                        wall_thickness.extend(plotting[data_id][property_list.index('wall_thickness')])
+                        velocity.extend(plotting[data_id][property_list.index('velocity')])
+
+                    #Creating a color map based on velocity
+                    #Normalizing velocity values for color mapping
+                    
+                    norm = plt.Normalize(min(velocity), max(velocity))
+                    colors = plt.cm.viridis(norm(velocity))
+                    
+                    plt.scatter(magnetization, wall_thickness, c=colors)
+                    plt.xlabel('Magnetization')
+                    plt.ylabel('Wall Thickness')
                     try:
-                        plt.show(block=True) # Plot anzeigen
-                        plt.close() # Plot schließen
+                        plt.show(block=True) 
+                        plt.close()
                     except:
-                        pass
+                        pass  
+                else:
+                    for data_id in plotting: # Für jede ausgewählte Zeile
+                        for punkte  in plotting[data_id]: # Für jeden Datenpunkt
+                            plt.plot(punkte,'o') # Datenpunkte plotten
+                        plt.legend(property_list,loc='upper center') # Legende hinzufügen
+                        try:
+                            plt.show(block=True) # Plot anzeigen
+                            plt.close() # Plot schließen
+                        except:
+                            pass
             else:
                 # Fehlermeldung, wenn keine Eigenschaft ausgewählt wurde
                 sg.popup_quick_message("Please select at least one property", auto_close=True, auto_close_duration=2)
