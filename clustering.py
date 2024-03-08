@@ -46,18 +46,19 @@ def clustering(selected_rows):
                 if set(property_list) == {'magnetization', 'velocity', 'wall_thickness'}:
                     for data_id in plotting: 
                         # Assuming data structure: [[magnetization], [velocity], [wall_thickness]]
-                        magnetization.append(plotting[data_id][property_list.index('magnetization')])
-                        wall_thickness.append(plotting[data_id][property_list.index('wall_thickness')])
-                        velocity.append(plotting[data_id][property_list.index('velocity')])
+                        magnetization.extend(plotting[data_id][property_list.index('magnetization')])
+                        wall_thickness.extend(plotting[data_id][property_list.index('wall_thickness')])
+                        velocity.extend(plotting[data_id][property_list.index('velocity')])
                     print(magnetization)
                     print(wall_thickness)
                     print(velocity)
-                        # Creating a color map based on velocity
-                        # Normalizing velocity values for color mapping
-                    #norm = plt.Normalize(min(velocity), max(velocity))
-                    #colors = plt.cm.viridis(norm(velocity))
+                    #Creating a color map based on velocity
+                    #Normalizing velocity values for color mapping
                     
-                    plt.scatter(magnetization, wall_thickness)
+                    norm = plt.Normalize(min(velocity), max(velocity))
+                    colors = plt.cm.viridis(norm(velocity))
+                    
+                    plt.scatter(magnetization, wall_thickness, c=colors)
                     plt.xlabel('Magnetization')
                     plt.ylabel('Wall Thickness')
                     try:
