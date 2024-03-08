@@ -34,39 +34,38 @@ def clustering(selected_rows):
             punkte=[]
             plotting={}
             property_list=[element for element in values if values[element]==True] # Ausgewählte Eigenschaften in einer Liste speichern
-            
-            
+            magnetization = []
+            wall_thickness = []
+            velocity = []
+
             if len(property_list)>0: # Überprüfen, ob mindestens eine Eigenschaft ausgewählt wurde
-                if property_list == ['magnetization', 'velocity', 'wall_thickness']:
-                    for data_id in selected_rows:  # Für jede ausgewählte Zeile
-                        punkte = get_data_property(data_id, property_list)  # Datenpunkte aus der Datenbank holen
-                        # Datenpunkte in ein Dictionary speichern
-                        plotting[data_id] = punkte
-                    magnetization = []
-                    velocity = []
-                    wall_thickness = []
+                for data_id in selected_rows: # Für jede ausgewählte Zeile
+                    punkte=get_data_property(data_id, property_list) # Datenpunkte aus der Datenbank holen
+                    plotting[data_id]=punkte # Datenpunkte in ein Dictionary speichern
 
-                    for data_id in plotting:  # Für jede ausgewählte Zeile
-                        # Separate the data points
-                        magnetization = [p[0] for p in plotting[data_id]]
-                        velocity = [p[1] for p in plotting[data_id]]
-                        wall_thickness = [p[2] for p in plotting[data_id]]
-
-                        # Normalize the velocity for color mapping
-                        norm_velocity = (np.array(velocity) - min(velocity)) / (max(velocity) - min(velocity))
-                        colors = plt.cm.rainbow(norm_velocity)
-
-                        #Plot with color mapping
-                        plt.scatter(magnetization, wall_thickness, c=colors, cmap='rainbow')
+                if set(property_list) == {'magnetization', 'velocity', 'wall_thickness'}:
+                    for data_id in plotting: 
+                        # Assuming data structure: [[magnetization], [velocity], [wall_thickness]]
+                        magnetization.append(plotting[data_id][property_list.index('magnetization')])
+                        wall_thickness.append(plotting[data_id][property_list.index('wall_thickness')])
+                        velocity.append(plotting[data_id][property_list.index('velocity')])
+                    print(magnetization)
+                    print(wall_thickness)
+                    print(velocity)
+                        # Creating a color map based on velocity
+                        # Normalizing velocity values for color mapping
+                    #norm = plt.Normalize(min(velocity), max(velocity))
+                    #colors = plt.cm.viridis(norm(velocity))
+                    
+                    plt.scatter(magnetization, wall_thickness)
                     plt.xlabel('Magnetization')
                     plt.ylabel('Wall Thickness')
-                    plt.colorbar(label='Velocity (normalized)')
-                    plt.show()      
-                                  
-                else:    
-                    for data_id in selected_rows: # Für jede ausgewählte Zeile
-                        punkte=get_data_property(data_id, property_list) # Datenpunkte aus der Datenbank holen
-                        plotting[data_id]=punkte # Datenpunkte in ein Dictionary speichern
+                    try:
+                        plt.show(block=True) 
+                        plt.close()
+                    except:
+                        pass  
+                else:
                     for data_id in plotting: # Für jede ausgewählte Zeile
                         for punkte  in plotting[data_id]: # Für jeden Datenpunkt
                             plt.plot(punkte,'o') # Datenpunkte plotten
