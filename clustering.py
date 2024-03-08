@@ -51,10 +51,10 @@ def clustering(selected_rows):
 
                     #Creating a color map based on velocity
                     #Normalizing velocity values for color mapping
-                    
                     norm = plt.Normalize(min(velocity), max(velocity))
                     colors = plt.cm.viridis(norm(velocity))
                     
+                    # Scatter plot of magnetization vs wall thickness with colors based on velocity
                     plt.scatter(magnetization, wall_thickness, c=colors)
                     plt.xlabel('Magnetization')
                     plt.ylabel('Wall Thickness')
