@@ -3,6 +3,8 @@
 import PySimpleGUI as sg
 from database import get_data_property
 from matplotlib import pyplot as plt
+import hdbscan
+import numpy as np
 
 # Definition des Clustering Fensters
 def clustering_window():
@@ -64,17 +66,37 @@ def clustering(selected_rows):
                     except:
                         pass  
                 else:
-                    for data_id in plotting: # Für jede ausgewählte Zeile
-                        for punkte  in plotting[data_id]: # Für jeden Datenpunkt
-                            plt.plot(punkte,'o') # Datenpunkte plotten
-                        plt.legend(property_list,loc='upper center') # Legende hinzufügen
-                        try:
-                            plt.show(block=True) # Plot anzeigen
-                            plt.close() # Plot schließen
-                        except:
-                            pass
+                    for data_id in plotting:  # Für jede ausgewählte Zeile
+                        # Datenpunkte vorbereiten
+                        data = np.array(plotting[data_id])
+
+                        # Clustering durchführen
+                        clusterer = hdbscan.HDBSCAN(min_cluster_size=5, min_samples=1)
+                        cluster_labels = clusterer.fit_predict(data)
+
+                        # Plot vorbereiten
+                        plt.figure()
+                        unique_labels = set(cluster_labels)
+                        colors = [plt.cm.Spectral(each) for each in np.linspace(0, 1, len(unique_labels))]
+
+                        # Jeden Cluster plotten
+                        for k, col in zip(unique_labels, colors):
+                            if k == -1:
+                                # Schwarz für Ausreißer
+                                col = [0, 0, 0, 1]
+
+                            class_member_mask = (cluster_labels == k)
+                            xy = data[class_member_mask]
+                            plt.plot(xy[:, 0], xy[:, 1], 'o', markerfacecolor=tuple(col), markeredgecolor='k', markersize=6)
+
+                        plt.title('HDBSCAN clustering')
+                        plt.xlabel(property_list[0])
+                        plt.ylabel(property_list[1])
+                        plt.show()
+                    except:
+                        pass
             else:
                 # Fehlermeldung, wenn keine Eigenschaft ausgewählt wurde
                 sg.popup_quick_message("Please select at least one property", auto_close=True, auto_close_duration=2)
-        
+
         continue # Nächste Benutzerinteraktion lesen
