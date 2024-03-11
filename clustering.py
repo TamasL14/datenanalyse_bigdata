@@ -3,6 +3,8 @@
 import PySimpleGUI as sg
 from database import get_data_property
 from matplotlib import pyplot as plt
+from scipy.stats import gaussian_kde
+import numpy as np
 
 # Definition des Clustering Fensters
 def clustering_window():
@@ -51,11 +53,14 @@ def clustering(selected_rows):
 
                     #Creating a color map based on velocity
                     #Normalizing velocity values for color mapping
-                    norm = plt.Normalize(min(velocity), max(velocity))
-                    colors = plt.cm.viridis(norm(velocity))
-                    
-                    # Scatter plot of magnetization vs wall thickness with colors based on velocity
-                    plt.scatter(magnetization, wall_thickness, c=colors)
+                    xy = np.vstack([magnetization, wall_thickness])
+                    kde = gaussian_kde(xy)(xy)
+                    norm_velocity = (velocity - np.min(velocity)) / (np.max(velocity) - np.min(velocity))
+                    sizes = (1 - norm_velocity) * 100                    
+
+                    fig, ax = plt.subplots()
+                    scatter = ax.scatter(magnetization, wall_thickness, c=kde, s=sizes, edgecolor='none', cmap='coolwarm')
+                    fig.colorbar(scatter, ax=ax, label='Density')
                     plt.xlabel('Magnetization')
                     plt.ylabel('Wall Thickness')
                     try:
