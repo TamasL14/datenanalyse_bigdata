@@ -51,12 +51,11 @@ def clustering(selected_rows):
                         wall_thickness.extend(plotting[data_id][property_list.index('wall_thickness')])
                         velocity.extend(plotting[data_id][property_list.index('velocity')])
 
-                    #Creating a color map based on velocity
-                    #Normalizing velocity values for color mapping
+
                     xy = np.vstack([magnetization, wall_thickness])
                     kde = gaussian_kde(xy)(xy)
                     norm_velocity = (velocity - np.min(velocity)) / (np.max(velocity) - np.min(velocity))
-                    sizes = (1 - norm_velocity) * 100                    
+                    sizes = (1 - norm_velocity) * 50                    
 
                     fig, ax = plt.subplots()
                     scatter = ax.scatter(magnetization, wall_thickness, c=kde, s=sizes, edgecolor='none', cmap='coolwarm')
