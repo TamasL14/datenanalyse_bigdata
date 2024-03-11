@@ -92,10 +92,12 @@ def replace_outliers_with_median(id, key,data):
     
     # Replace outliers with median
     median_value = np.median(data)
+    #print(f'Untere Grenze: {lower_bound}, Obere Grenze: {upper_bound}, Median: {median_value} für {key}')
     modified_data = []
     for val in data:
         if val < lower_bound or val > upper_bound:
-            val = min(max(val, lower_bound), upper_bound)
+            #print(f'Outlier: {val} für {key}')
+            val = median_value
         modified_data.append(val)
     return modified_data
 
