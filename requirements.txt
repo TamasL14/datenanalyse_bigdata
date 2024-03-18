@@ -1,0 +1,9 @@
+pysimplegui
+numpy
+matplotlib
+scipy
+hdbscan
+seaborn
+h5py
+pymongo
+python-dotenv
