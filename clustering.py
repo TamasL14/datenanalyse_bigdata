@@ -6,6 +6,8 @@ from matplotlib import pyplot as plt
 from scipy.stats import gaussian_kde
 from filter_table import filter_rows_by_conf_instr
 import numpy as np
+import hdbscan
+import seaborn as sns
 import pandas as pd
 from scipy.optimize import curve_fit
 
@@ -113,6 +115,71 @@ def clustering(selected_rows):
                 sg.popup_quick_message("Please select at least one property", auto_close=True, auto_close_duration=2)
         
         continue # Nächste Benutzerinteraktion lesen
+
+
+def cluster_hdbscan(selected_rows):
+    while True:
+        window = clustering_window() # Öffnen des Clustering Fensters
+        event, values = window.read() # Benutzerinteraktion mit dem Fenster lesen
+        # Wenn das Fenster geschlossen wird oder der "Cancel" Button gedrückt wird
+        if event == '-CANCEL-' or event == sg.WIN_CLOSED: 
+            window.close() # Fenster schließen
+            break
+
+        # Wenn der "Submit" Button gedrückt wird
+        if event == '-SUBMIT-':
+
+            # Variablen initialisieren
+            punkte=[]
+            plotting={}
+            property_list=[element for element in values if values[element]==True] # Ausgewählte Eigenschaften in einer Liste speichern
+            magnetization = []
+            wall_thickness = []
+            velocity = []
+            
+            if len(property_list)>0: # Überprüfen, ob mindestens eine Eigenschaft ausgewählt wurde
+                for data_id in selected_rows: # Für jede ausgewählte Zeile
+                    punkte=get_data_property(data_id, property_list) # Datenpunkte aus der Datenbank holen
+                    plotting[data_id]=punkte # Datenpunkte in ein Dictionary speichern
+
+                if set(property_list) == {'magnetization', 'wall_thickness'}:
+                    for data_id in plotting: 
+                        # Assuming data structure: [[magnetization], [velocity], [wall_thickness]]
+                        magnetization.extend(plotting[data_id][property_list.index('magnetization')])
+                        wall_thickness.extend(plotting[data_id][property_list.index('wall_thickness')])
+                        
+                        combined_array = np.column_stack((magnetization, wall_thickness))
+
+                        clusterer = hdbscan.HDBSCAN(min_cluster_size=15).fit(combined_array)
+                        cluster_labels = clusterer.labels_
+                        cluster_colors = [plt.cm.Spectral(each)
+                                          for each in np.linspace(0, 1, len(set(cluster_labels)))]
+
+                        for i, color in enumerate(cluster_colors):
+                            mask = (cluster_labels == i)
+                            if np.any(mask):
+                                plt.scatter(np.array(magnetization)[mask], np.array(wall_thickness)[mask], s=50, linewidth=0, c=[color], alpha=0.5, label=f'Cluster {i}')
+
+                    plt.xlabel('Magnetization')
+                    plt.ylabel('Wall Thickness')
+                    plt.show(block=True) 
+                    plt.close()
+                else:
+                    for data_id in plotting: # Für jede ausgewählte Zeile
+                        for punkte  in plotting[data_id]: # Für jeden Datenpunkt
+                            plt.plot(punkte,'o') # Datenpunkte plotten
+                        plt.legend(property_list,loc='upper center') # Legende hinzufügen
+                        try:
+                            plt.show(block=True) # Plot anzeigen
+                            plt.close() # Plot schließen
+                        except:
+                            pass
+            else:
+                # Fehlermeldung, wenn keine Eigenschaft ausgewählt wurde
+                sg.popup_quick_message("Please select at least one property", auto_close=True, auto_close_duration=2)
+        
+        continue # Nächste Benutzerinteraktion lesen
+
 
 # Standard plotall
 def plotall(selected_rows):
