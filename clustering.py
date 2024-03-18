@@ -67,7 +67,7 @@ def clustering(selected_rows):
                         temp_df.columns = property_list
                         temp_df['data_id'] = data_id
                         df = pd.concat([df, temp_df], ignore_index=True)
-                    """
+                    
                     x_data = df['wall_thickness']
                     y_data = df['magnetization']
                     
@@ -78,8 +78,10 @@ def clustering(selected_rows):
                     y_poly_fit = polynom(x_data, *popt_poly)
                     y_sinus_fit = sinus(x_data, *popt_sinus)
                     y_exp_fit = exponential(x_data, *popt_exp)
-                    """
-
+                    
+                    poly_eq = f'{popt_poly[0]:.2f} * x^2 + {popt_poly[1]:.2f} * x + {popt_poly[2]:.2f}'
+                    sinus_eq = f'{popt_sinus[0]:.2f} * sin({popt_sinus[1]:.2f} * x + {popt_sinus[2]:.2f})'
+                    exp_eq = f'{popt_exp[0]:.2f} * exp({popt_exp[1]:.2f} * x)'
 
                     xy = np.vstack([df['wall_thickness'], df['magnetization']])
                     kde = gaussian_kde(xy)(xy)
@@ -88,10 +90,15 @@ def clustering(selected_rows):
 
                     fig, ax = plt.subplots()
                     scatter = ax.scatter(df['wall_thickness'], df['magnetization'], c=kde, s=sizes, edgecolor='none', cmap='coolwarm')
-                    """plt.plot(x_data, y_poly_fit, label='Polynom-Fit', color='red')
+                    #plt.plot(x_data, y_poly_fit, label='Polynom-Fit', color='red')
+                    #fig.text(0.5, 0.02, f'Polynom: y = {poly_eq}', ha='right', va='bottom', fontsize=10)
                     plt.plot(x_data, y_sinus_fit, label='Sinus-Fit', color='green')
-                    plt.plot(x_data, y_exp_fit, label='Exponential-Fit', color='blue')
-                    """
+                    fig.text(0.5, 0.01, f'Sinus: y = {sinus_eq}', ha='right', va='bottom', fontsize=10)
+                    #plt.plot(x_data, y_exp_fit, label='Exponential-Fit', color='blue')
+                    #fig.text(0.5, 0.00, f'Exp: y = {exp_eq}', ha='right', va='bottom', fontsize=10)
+                    
+                    
+                    
                     fig.colorbar(scatter, ax=ax, label='Density')
                     plt.ylabel('Magnetization')
                     plt.xlabel('Wall Thickness')    
