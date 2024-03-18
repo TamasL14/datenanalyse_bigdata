@@ -107,14 +107,13 @@ def linear_regression_detrend(data):
     n = len(data)
     X = np.arange(n).reshape(-1, 1)
     y = np.array(data)
-    y = np.where(y < 0, y * -1, y)
     model = LinearRegression()
     model.fit(X, y)
     trend = model.predict(X)
     notadjusted = y - trend
     original_start_value_avg = np.mean(data[:5])
     if original_start_value_avg < 0:
-        adjustement = (original_start_value_avg * -1) + notadjusted[0]
+        adjustement = (original_start_value_avg) + notadjusted[0]
     else:
         adjustement = original_start_value_avg - notadjusted[0]
     return abs(y - trend + adjustement)

@@ -82,3 +82,13 @@ def filter_table(data_in_collection, continent_options, instrument_options):
 
             window.close()  # Close the filter window
             return filtered_data  # Return the filtered data to the main program#
+
+
+def filter_rows_by_conf_instr(selected_rows, conf, instr):
+    #print(data_rows)
+    filtered_rows = []
+    for row in selected_rows:
+        if row[3] == conf and row[4] == instr:  # Annahme: Index 3 ist für Konfiguration, Index 4 für Instrument
+            filtered_rows.append(row[1])  # Annahme: Index 1 enthält die data_id
+    print(filtered_rows)
+    return filtered_rows

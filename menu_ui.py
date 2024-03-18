@@ -12,7 +12,8 @@ from data_prep import prep_file, prep_folder
 from database import connect_to_db, get_data
 from clustering import clustering
 from filter_table import filter_table
-
+from clustering import plotall
+from filter_table import filter_rows_by_conf_instr
 # Definition der Hauptlayout
 def define_layout(data_in_collection, table_row_colors):
     # Oberste Zeile der Tabelle
@@ -25,7 +26,7 @@ def define_layout(data_in_collection, table_row_colors):
         [sg.Text("Willkommen zu ROSEN Clustering", justification='center', size=(40, 1), font=("Helvetica", 25))],
         [sg.Column([[sg.Button("Tabelle filtern", key='-FILTER-'), sg.Button("Filter zurücksetzen", key='-FILTER_DELETE-'), sg.Checkbox("Alle auswählen", key='-TAKE_ALL-', default=False, enable_events=True)]], justification="center",  expand_x=True, expand_y=True)],
         [sg.Column(table_layout, justification="center",  expand_x=True, expand_y=True)],
-        [sg.Column([[sg.Button("Datei hochladen", key='-FILE_UPLOAD-'), sg.Button("Ordner hochladen", key='-FOLDER_UPLOAD-'), sg.Button("Plot", key='-PLOT-'), sg.Button("Cancel", key='-CANCEL-')]], justification="center")],
+        [sg.Column([[sg.Button("Datei hochladen", key='-FILE_UPLOAD-'), sg.Button("Ordner hochladen", key='-FOLDER_UPLOAD-'), sg.Button("Plot", key='-PLOT-'), sg.Button("Cancel", key='-CANCEL-'), sg.Button("Alles plotten", key='-Plot_ALl-')]], justification="center")]   
     ]
     return layout
 
@@ -206,6 +207,24 @@ while True:
 
     # Loop erhöhen
     loop+=1
+
+    # Wenn der Benutzer auf "Plot" klickt, wird die Funktion clustering() aus der Datei clustering.py aufgerufen
+    if event == '-Plot_ALl-':
+        # Fenster schließen und loop zurücksetzen
+        window.close()
+        loop=0
+        # Prüfen, ob mindestens eine Datei aus der Tabelle ausgewählt wurde
+        if len(selected_rows)>0:
+            #try:
+                # Die Funktion clustering() aus der Datei clustering.py wird aufgerufen
+                plotall(selected_rows)
+
+            #except:
+               # pass
+            # Fehlermeldung, wenn keine Datei ausgewählt wurde
+        sg.popup_quick_message("Wähle bitte mindestens eine Datei aus!", auto_close=True, auto_close_duration=2)
+        time.sleep(1)
+        continue
 
 # Fenster schließen, wenn das noch nicht geschehen ist
 try:
