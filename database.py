@@ -78,7 +78,6 @@ def get_cluster_center_from_selectedrows(data_id):
     data = data.get("DATASET") # Inhalt der Datei holen    
     data = data.get("attributes") # Inhalt der Datei holen
     data = data.get("Mittelpunkte_Cluster") # Inhalt der Datei holen
-    print(data)
     return data
 
 

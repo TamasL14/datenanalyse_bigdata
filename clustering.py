@@ -7,25 +7,17 @@ from matplotlib import pyplot as plt
 from scipy.stats import gaussian_kde
 from filter_table import filter_rows_by_conf_instr
 from database import get_cluster_center
+from sklearn.metrics import r2_score
 import numpy as np
 import hdbscan
 import seaborn as sns
 import pandas as pd
-from sklearn.linear_model import RANSACRegressor
 from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import PolynomialFeatures
+from sklearn.preprocessing import PolynomialFeatures, FunctionTransformer
+from sklearn.linear_model import RANSACRegressor
 from scipy.optimize import curve_fit
 
 
-# Funktionen für die polynomiale Transformation
-def poly_features(degree):
-    return PolynomialFeatures(degree=degree, include_bias=False)
-
-# Robustes Fitting-Modell erstellen
-def ransac_fit(x, y, degree):
-    model = make_pipeline(poly_features(degree), RANSACRegressor())
-    model.fit(x[:, np.newaxis], y)
-    return model
 
 def parabel(x, a, b, c):
     return a * x**2 + b * x + c
@@ -33,14 +25,75 @@ def parabel(x, a, b, c):
 def kubisch(x, a, b, c, d):
     return a * x**3 + b * x**2 + c * x + d
 
-def abs_value(x, a, b, c):
-    return a * np.abs(x) + b * x + c
-
 def sinus(x, a, b, c):
     return a * np.sin(b * x + c)
 
 def linear(x, a, b):
     return a * x + b
+
+def cosinus(x, a, b, c):
+    return a * np.cos(b * x + c)
+
+def exponential(x, a, b):
+    return a * np.exp(b * x)
+
+def ransac_poly_fit(x, y, degree):
+    model = make_pipeline(PolynomialFeatures(degree=degree), RANSACRegressor())
+    model.fit(x[:, np.newaxis], y)
+    return model
+
+def calculate_r2(model, x_data, y_data):
+    predictions = model.predict(x_data)
+    return r2_score(y_data, predictions)
+
+def calculate_adjusted_r_squared(model, x_data, y_data, num_predictors):
+    r2 = calculate_r2(model, x_data, y_data)
+    n = len(y_data)  # Anzahl der Beobachtungen
+    adj_r2 = 1 - (1 - r2) * (n - 1) / (n - num_predictors - 1)
+    return adj_r2
+
+# Sinus- und Cosinus-Transformationen
+def sinus_cosinus_transform(x):
+    return np.column_stack((np.sin(x), np.cos(x)))
+
+def exponential_transform(x):
+    x = np.clip(x, a_min=0, a_max=None)  # Verhindert negative Eingaben für den Logarithmus
+    return np.log1p(x)  # Logarithmus-Transformation
+
+def ransac_nonlinear_fit(x, y, transform_func):
+    transformer = FunctionTransformer(transform_func, validate=True)
+    model = make_pipeline(transformer, RANSACRegressor())
+    model.fit(x[:, np.newaxis], y)
+    return model
+
+def sinus_transform(x):
+    return np.sin(x)
+
+def cosinus_transform(x):
+    return np.cos(x)
+
+def calculate_adjusted_r_squared(model, x_data, y_data, num_predictors):
+    predictions = model.predict(x_data)
+    r2 = r2_score(y_data, predictions)
+    n = len(y_data)  # Anzahl der Beobachtungen
+    adj_r2 = 1 - (1 - r2) * (n - 1) / (n - num_predictors - 1)
+    return adj_r2
+
+
+def create_ransac_pipeline(func, degree=1, transformer=None):
+    if transformer:
+        return make_pipeline(FunctionTransformer(transformer, validate=False), 
+                             PolynomialFeatures(degree=degree), RANSACRegressor())
+    else:
+        return make_pipeline(PolynomialFeatures(degree=degree), RANSACRegressor())
+
+def get_poly_model_parameters(model, degree):
+    estimator = model.named_steps['ransacregressor'].estimator_
+    coefs = estimator.coef_
+    intercept = estimator.intercept_
+
+    # Für Polyfunktionen ist der Koeffizient für den Term x^0 (also das Absolutglied) im Intercept
+    return np.concatenate(([intercept], coefs[1:degree+1])) 
 
 # Definition des Clustering Fensters
 def clustering_window():
@@ -94,21 +147,18 @@ def clustering(selected_rows):
                     
                     popt_parabel, _ = curve_fit(parabel, x_data, y_data)
                     popt_kubisch, _ = curve_fit(kubisch, x_data, y_data, maxfev=10000)
-                    popt_abs, _ = curve_fit(abs_value, x_data, y_data, maxfev=10000)
                     popt_sinus, _ = curve_fit(sinus, x_data, y_data)
                     popt_linear, _ = curve_fit(linear, x_data, y_data)
 
                     # Angepasste Funktionen berechnen
                     y_parabel_fit = parabel(x_data, *popt_parabel)
                     y_kubisch_fit = kubisch(x_data, *popt_kubisch)
-                    y_abs_fit = abs_value(x_data, *popt_abs)
                     y_sinus_fit = sinus(x_data, *popt_sinus)
                     y_linear_fit = linear(x_data, *popt_linear)
                     
                     poly_eq = f'{popt_parabel[0]:.2f} * x^2 + {popt_parabel[1]:.2f} * x + {popt_parabel[2]:.2f}'
                     sinus_eq = f'{popt_sinus[0]:.2f} * sin({popt_sinus[1]:.2f} * x + {popt_sinus[2]:.2f})'
                     kubisch_eq = f'{popt_kubisch[0]:.2f} * x^3 + {popt_kubisch[1]:.2f} * x^2 + {popt_kubisch[2]:.2f} * x + {popt_kubisch[3]:.2f}'
-                    abs_eq = f'{popt_abs[0]:.2f} * abs(x) + {popt_abs[1]:.2f} * x + {popt_abs[2]:.2f}'
                     linear_eq = f'{popt_linear[0]:.2f} * x + {popt_linear[1]:.2f}'
 
                     xy = np.vstack([df['wall_thickness'], df['magnetization']])
@@ -120,7 +170,6 @@ def clustering(selected_rows):
                     scatter = ax.scatter(df['wall_thickness'], df['magnetization'], c=kde, edgecolor='none', cmap='coolwarm')
                     plt.plot(x_data, y_parabel_fit, label='Parabel-Fit', color='red')
                     plt.plot(x_data, y_kubisch_fit, label='Kubisch-Fit', color='orange')
-                    plt.plot(x_data, y_abs_fit, label='Absolutwert-Fit', color='yellow')
                     plt.plot(x_data, y_sinus_fit, label='Sinus-Fit', color='green')
                     plt.plot(x_data, y_linear_fit, label='Linear-Fit', color='blue')
                     
@@ -194,7 +243,6 @@ def cluster_hdbscan(selected_rows):
                                 points_in_cluster = combined_array[cluster_labels == cluster]
                                 cluster_center = points_in_cluster.mean(axis=0)
                                 cluster_centers.append(cluster_center)
-                        print(cluster_centers)
                         cluster_colors = [plt.cm.Spectral(each)
                         for each in np.linspace(0, 1, len(set(cluster_labels)))]
 
@@ -376,29 +424,161 @@ def plotall(selected_rows):
         df = pd.concat([df, temp_df], ignore_index=True)
         
     df = df.sort_values(by='x_coord', ascending=True)   
-    x_data = np.array(df['x_coord'].tolist())
+    x_data = np.array(df['x_coord'].tolist()).reshape(-1, 1)
     y_data = np.array(df['y_coord'].tolist())
+    model_parabel = create_ransac_pipeline(None, degree=2)
+    model_kubisch = create_ransac_pipeline(None, degree=3)
+    model_sinus = create_ransac_pipeline(sinus_transform, degree=1)  # Definiere sinus_transform entsprechend
+    model_cosinus = create_ransac_pipeline(cosinus_transform, degree=1)  # Definiere cosinus_transform entsprechend
+    model_linear = create_ransac_pipeline(None, degree=1)
+    model_exponential = create_ransac_pipeline(exponential_transform, degree=1)  # Definiere exponential_transform entsprechend
 
-    if len(x_data) > 0 and len(y_data) > 0:
-        fig, ax = plt.subplots()
 
-        # Parabel (2. Grad)
-        model_parabel = ransac_fit(x_data, y_data, 2)
-        y_parabel_fit = model_parabel.predict(x_data[:, np.newaxis])
-        plt.plot(x_data, y_parabel_fit, label='Robuster Parabel-Fit', color='red')
+    # Anpassen der Modelle
+    model_parabel.fit(x_data, y_data)
+    model_kubisch.fit(x_data, y_data)
+    model_sinus.fit(x_data, y_data)
+    model_cosinus.fit(x_data, y_data)
+    model_linear.fit(x_data, y_data)
+    model_exponential.fit(x_data, y_data)
+    
+    num_predictors_parabel = 3  # a, b, c
+    num_predictors_kubisch = 4  # a, b, c, d
+    num_predictors_sinus = 3  # a, b, c
+    num_predictors_linear = 2  # a, b
+    num_predictors_cosinus = 3  # a, b, c
+    num_predictors_exponential = 2  # a, b
 
-        # Kubisch (3. Grad)
-        model_kubisch = ransac_fit(x_data, y_data, 3)
-        y_kubisch_fit = model_kubisch.predict(x_data[:, np.newaxis])
-        #plt.plot(x_data, y_kubisch_fit, label='Robuster Kubisch-Fit', color='orange')
+    adj_r2_parabel = calculate_adjusted_r_squared(model_parabel, x_data, y_data, num_predictors_parabel)
+    adj_r2_kubisch = calculate_adjusted_r_squared(model_kubisch, x_data, y_data, num_predictors_kubisch)
+    adj_r2_sinus = calculate_adjusted_r_squared(model_sinus, x_data, y_data, num_predictors_sinus)
+    adj_r2_linear = calculate_adjusted_r_squared(model_linear, x_data, y_data, num_predictors_linear)
+    adj_r2_cosinus = calculate_adjusted_r_squared(model_cosinus, x_data, y_data, num_predictors_cosinus)
+    adj_r2_exponential = calculate_adjusted_r_squared(model_exponential, x_data, y_data, num_predictors_exponential)
 
-        # Weitere Modelle (Absolutwert, Sinus, Linear) können hier hinzugefügt werden...
+    r2_values = {
+    'Parabel': calculate_adjusted_r_squared(model_parabel, x_data, y_data, num_predictors_parabel),
+    'Kubisch': calculate_adjusted_r_squared(model_kubisch, x_data, y_data, num_predictors_kubisch),
+    'Sinus': calculate_adjusted_r_squared(model_sinus, x_data, y_data, num_predictors_sinus),
+    'Linear': calculate_adjusted_r_squared(model_linear, x_data, y_data, num_predictors_linear),
+    'Cosinus': calculate_adjusted_r_squared(model_cosinus, x_data, y_data, num_predictors_cosinus),
+    'Exponential': calculate_adjusted_r_squared(model_exponential, x_data, y_data, num_predictors_exponential)
+    }
+    print(r2_values)
+    best_two = sorted(r2_values, key=r2_values.get, reverse=True)[:2]
 
-        plt.scatter(x_data, y_data, label='Originaldaten')
-        plt.legend()
-        plt.xlabel('x')
-        plt.ylabel('y')
-        plt.title('Vergleich verschiedener robuster Fits')
-        plt.show()
 
+    print("Adjusted R-squared for Parabel: ", adj_r2_parabel)
+    print("Adjusted R-squared for Kubisch: ", adj_r2_kubisch)
+    print("Adjusted R-squared for Sinus: ", adj_r2_sinus)
+    print("Adjusted R-squared for Linear: ", adj_r2_linear)
+    print("Adjusted R-squared for Cosinus: ", adj_r2_cosinus)
+    print("Adjusted R-squared for Exponential: ", adj_r2_exponential)
+
+    parabel_params = get_poly_model_parameters(model_parabel, 2) # Grad 2 für Parabel
+    kubisch_params = get_poly_model_parameters(model_kubisch, 3) # Grad 3 für Kubisch
+    linear_params = get_poly_model_parameters(model_linear, 1)   # Grad 1 für Linear
+
+    parabel_eq = f"{parabel_params[2]:.2f}x² + {parabel_params[1]:.2f}x + {parabel_params[0]:.2f}"
+
+    # Kubisch
+    kubisch_eq = f"{kubisch_params[3]:.2f}x³ + {kubisch_params[2]:.2f}x² + {kubisch_params[1]:.2f}x + {kubisch_params[0]:.2f}"
+
+    # Linear
+    linear_eq = f"{linear_params[1]:.2f}x + {linear_params[0]:.2f}"
+
+
+
+    #if len(x_data) > 0 and len(y_data) > 0:
+     #   fig, ax = plt.subplots()
+    """
+    popt_parabel, _ = curve_fit(parabel, x_data, y_data)
+    popt_kubisch, _ = curve_fit(kubisch, x_data, y_data, maxfev=10000)
+    popt_sinus, _ = curve_fit(sinus, x_data, y_data)
+    popt_linear, _ = curve_fit(linear, x_data, y_data)
+    popt_cosinus, _ = curve_fit(cosinus, x_data, y_data)
+    popt_exponential, _ = curve_fit(exponential, x_data, y_data)
+
+    # Angepasste Funktionen berechnen
+    y_parabel_fit = parabel(x_data, *popt_parabel)
+    y_kubisch_fit = kubisch(x_data, *popt_kubisch)
+    y_sinus_fit = sinus(x_data, *popt_sinus)
+    y_linear_fit = linear(x_data, *popt_linear)
+    y_cosinus_fit = cosinus(x_data, *popt_cosinus)
+    y_exponential_fit = exponential(x_data, *popt_exponential)
+    num_predictors_parabel = 3  # a, b, c
+    num_predictors_kubisch = 4  # a, b, c, d
+    num_predictors_sinus = 3  # a, b, c
+    num_predictors_linear = 2  # a, b
+    num_predictors_cosinus = 3  # a, b, c
+    num_predictors_exponential = 2  # a, b
+
+    # Berechnung des angepassten R-Quadrat für jede Funktion
+    adj_r2_parabel = calculate_adjusted_r_squared(y_parabel_fit, x_data, y_data, num_predictors_parabel)
+    adj_r2_kubisch = calculate_adjusted_r_squared(y_kubisch_fit, x_data, y_data, num_predictors_kubisch)
+    adj_r2_sinus = calculate_adjusted_r_squared(y_sinus_fit, x_data, y_data, num_predictors_sinus)
+    adj_r2_linear = calculate_adjusted_r_squared(y_linear_fit, x_data, y_data, num_predictors_linear)
+    adj_r2_cosinus = calculate_adjusted_r_squared(y_cosinus_fit, x_data, y_data, num_predictors_cosinus)
+    adj_r2_exponential = calculate_adjusted_r_squared(y_exponential_fit, x_data, y_data, num_predictors_exponential)
+
+    #Print the adjusted R-squared values
+    print("Adjusted R-squared for Parabel: ", adj_r2_parabel)
+    print("Adjusted R-squared for Kubisch: ", adj_r2_kubisch)
+    print("Adjusted R-squared for Linear: ", adj_r2_linear)
+    print("Adjusted R-squared for Sinus: ", adj_r2_sinus)
+    print("Adjusted R-squared for Cosinus: ", adj_r2_cosinus)
+    print("Adjusted R-squared for Exponential: ", adj_r2_exponential)
+
+    
+    # Formatierung der Gleichungen für alle Fits
+    poly_eq = f'{popt_parabel[0]:.2f} * x^2 + {popt_parabel[1]:.2f} * x + {popt_parabel[2]:.2f}'
+    sinus_eq = f'{popt_sinus[0]:.2f} * sin({popt_sinus[1]:.2f} * x + {popt_sinus[2]:.2f})'
+    kubisch_eq = f'{popt_kubisch[0]:.2f} * x^3 + {popt_kubisch[1]:.2f} * x^2 + {popt_kubisch[2]:.2f} * x + {popt_kubisch[3]:.2f}'
+    linear_eq = f'{popt_linear[0]:.2f} * x + {popt_linear[1]:.2f}'
+    cosinus_eq = f'{popt_cosinus[0]:.2f} * cos({popt_cosinus[1]:.2f} * x + {popt_cosinus[2]:.2f})'
+    exp_eq = f'{popt_exponential[0]:.2f} * exp({popt_exponential[1]:.2f} * x)'  
+    # Erstellen deines Plots
+    """
+    fig, ax = plt.subplots()
+    #plt.scatter(x_data, y_data, label='Originaldaten')
+    plt.scatter(df['x_coord'], df['y_coord'], label='Originaldaten')
+    """
+    plt.plot(x_data, y_parabel_fit, label='Parabel-Fit', color='red')
+    plt.plot(x_data, y_sinus_fit, label='Sinus-Fit', color='green')
+    plt.plot(x_data, y_kubisch_fit, label='Kubisch-Fit', color='orange')
+    plt.plot(x_data, y_linear_fit, label='Linear-Fit', color='purple')
+    plt.plot(x_data, y_cosinus_fit, label='Cosinus-Fit', color='blue')
+    plt.plot(x_data, y_exponential_fit, label='Exponential-Fit', color='magenta')
+    """
+
+    x_range = np.linspace(x_data.min(), x_data.max(), 100).reshape(-1, 1)
+    if 'Parabel' in best_two:
+        plt.plot(x_range, model_parabel.predict(x_range), label='Beste Parabel-Fit', color='red')
+    if 'Kubisch' in best_two:
+        plt.plot(x_range, model_kubisch.predict(x_range), label='Beste Kubisch-Fit', color='orange')
+    if 'Sinus' in best_two:
+        plt.plot(x_range, model_sinus.predict(x_range), label='Beste Sinus-Fit', color='green')
+    if 'Linear' in best_two:
+        plt.plot(x_range, model_linear.predict(x_range), label='Beste Linear-Fit', color='purple')
+    if 'Cosinus' in best_two:
+        plt.plot(x_range, model_cosinus.predict(x_range), label='Beste Cosinus-Fit', color='blue')
+    if 'Exponential' in best_two:
+        plt.plot(x_range, model_exponential.predict(x_range), label='Beste Exponential-Fit', color='magenta')
+
+
+    """
+        # Füge die Gleichungen zum Plot hinzu
+    plt.legend()
+    fig.text(0.05, 0.02, f'Parabel: {poly_eq}', fontsize=10)
+    fig.text(0.05, 0.01, f'Sinus: {sinus_eq}', fontsize=10)
+    fig.text(0.95, 0.02, f'Kubisch: {kubisch_eq}', fontsize=10, ha='right')
+    fig.text(0.95, 0.00, f'Linear: {linear_eq}', fontsize=10, ha='right')
+    fig.text(0.95, -0.05, f'Cosinus: {cosinus_eq}', fontsize=10, ha='right')
+    fig.text(0.95, -0.10, f'Exponential: {exp_eq}', fontsize=10, ha='right')
+
+    """
+    plt.xlabel('Magnetization')
+    plt.ylabel('Wall Thickness')
+    plt.legend()
+    plt.show()
 
