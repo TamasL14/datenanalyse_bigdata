@@ -14,6 +14,7 @@ from clustering import clustering, cluster_hdbscan
 from filter_table import filter_table
 from clustering import plotall
 from filter_table import filter_rows_by_conf_instr
+
 # Definition der Hauptlayout
 def define_layout(data_in_collection, table_row_colors):
     # Oberste Zeile der Tabelle
@@ -238,7 +239,6 @@ while True:
             #except:
                # pass
             # Fehlermeldung, wenn keine Datei ausgewählt wurde
-        sg.popup_quick_message("Wähle bitte mindestens eine Datei aus!", auto_close=True, auto_close_duration=2)
         time.sleep(1)
         continue
 

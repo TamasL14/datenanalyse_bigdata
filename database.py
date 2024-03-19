@@ -49,6 +49,39 @@ def get_data():
 
     return data_in_collection
 
+def get_cluster_center(given_instrument, given_kontinent):
+    projection = {
+        "_id": 1,
+        "DATASET.attributes.Mittelpunkte_Cluster": 1,
+        "DATASET.attributes.instrument": 1,
+        "DATASET.attributes.configuration": 1
+    }
+    query = {
+        "DATASET.attributes.instrument": given_instrument,
+        "DATASET.attributes.configuration": given_kontinent
+    }
+    data = list(collection.find(query, projection))
+    cluster_centers = []
+
+    for document in data:
+        if "DATASET" in document and "attributes" in document["DATASET"] and "Mittelpunkte_Cluster" in document["DATASET"]["attributes"]:
+            for center in document["DATASET"]["attributes"]["Mittelpunkte_Cluster"]:
+                cluster_centers.append(center)
+
+    return cluster_centers
+
+# Verwende die Funktion:
+# results = cluster_center(collection, specific_data_id, specific_instrument, specific_kontinent)
+
+def get_cluster_center_from_selectedrows(data_id):
+    data = collection.find_one({'_id':data_id}) # Datei mit dem entsprechenden data_id holen   
+    data = data.get("DATASET") # Inhalt der Datei holen    
+    data = data.get("attributes") # Inhalt der Datei holen
+    data = data.get("Mittelpunkte_Cluster") # Inhalt der Datei holen
+    print(data)
+    return data
+
+
 # Funktion um die Datensätze aus der Datenbank herunterzuladen
 def get_data_property(data_id,property_list):
     punkte=[]   

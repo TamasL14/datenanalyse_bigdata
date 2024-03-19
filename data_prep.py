@@ -12,6 +12,7 @@ import base64
 import numpy as np
 import os
 import math
+import hdbscan
 from sklearn.linear_model import LinearRegression
 from itertools import islice
 from datetime import datetime
@@ -117,6 +118,7 @@ def linear_regression_detrend(data):
     else:
         adjustement = original_start_value_avg - notadjusted[0]
     return abs(y - trend + adjustement)
+
 
 """ --- Funktionen, um die .h5-Dateien in .json-Dateien umzuwandeln ---"""
 # Funktion um die .h5-Dateien in .json-Dateien umzuwandeln
@@ -252,7 +254,26 @@ def convert_h5_to_json(file_path):
             compensated_magnetization = dataset['magnetization']
             print("Error in linear regression {}".format(file_path))
 
-        group_attributes['datum']=datetime.utcfromtimestamp(float(time)).strftime('%Y-%m-%d') # Datum des Datensatzes als Attribute hinzufügen
+
+        cluster_centers = []
+        wall_thickness_valueS = [data_point['wall_thickness'] for data_point in new_json_data]
+        magnetization_values = [data_point['magnetization'] for data_point in new_json_data]
+        combined_array = np.column_stack((magnetization_values, wall_thickness_valueS))
+        clusterer = hdbscan.HDBSCAN(min_cluster_size=15).fit(combined_array)
+        cluster_labels = clusterer.labels_
+        unique_clusters = set(cluster_labels)
+        for cluster in unique_clusters:
+                if cluster != -1:  # Ignoriere Rauschen, das als -1 gekennzeichnet ist
+                    points_in_cluster = combined_array[cluster_labels == cluster]
+                    cluster_center = points_in_cluster.mean(axis=0)
+                    cluster_centers.append(cluster_center)
+        cluster_centers_np = np.array(cluster_centers)
+        cluster_centers_list_of_lists = cluster_centers_np.tolist()
+        group_attributes['Mittelpunkte_Cluster']=cluster_centers_list_of_lists 
+
+ 
+        # Datum des Datensatzes als Attribute hinzufügen
+        group_attributes['datum']=datetime.utcfromtimestamp(float(time)).strftime('%Y-%m-%d')
         json_data['attributes'] = group_attributes # Attribute in das JSON-Objekt einfügen
         json_data['data'] = new_json_data # Datensätze in das JSON-Objekt einfügen
         return data_id, json_data
