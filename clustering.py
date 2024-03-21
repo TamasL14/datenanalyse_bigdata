@@ -8,6 +8,11 @@ from scipy.stats import gaussian_kde
 from filter_table import filter_rows_by_conf_instr
 from database import get_cluster_center
 from sklearn.metrics import r2_score
+from sklearn.cluster import KMeans
+from sklearn.cluster import DBSCAN
+from sklearn.metrics import pairwise_distances
+from scipy.fft import rfftfreq, rfft
+from scipy import stats
 import numpy as np
 import hdbscan
 import seaborn as sns
@@ -25,17 +30,30 @@ def parabel(x, a, b, c):
 def kubisch(x, a, b, c, d):
     return a * x**3 + b * x**2 + c * x + d
 
-def sinus(x, a, b, c):
-    return a * np.sin(b * x + c)
 
 def linear(x, a, b):
     return a * x + b
 
-def cosinus(x, a, b, c):
-    return a * np.cos(b * x + c)
+def sinus(x, amplitude, frequency, phase, offset):
+    return amplitude * np.sin(frequency * x + phase) + offset
 
-def exponential(x, a, b):
-    return a * np.exp(b * x)
+def cosinus(x, amplitude, frequency, phase, offset):
+    return amplitude * np.cos(frequency * x + phase) + offset
+
+def exponential(x, a, b, c):
+    return a * np.exp(b * x) + c
+
+def fit_exponential(clustered_data_x, clustered_data_y):
+
+    # Anfangsschätzungen für die Parameter a, b und c
+    a_initial = np.max(clustered_data_y)
+    b_initial = -1.0 / (np.max(clustered_data_x) - np.min(clustered_data_x))
+    c_initial = np.min(clustered_data_y)
+
+    # Anpassen der exponentiellen Funktion an die Daten
+    popt_exponential, _ = curve_fit(exponential, clustered_data_x, clustered_data_y, 
+                                    p0=[a_initial, b_initial, c_initial], maxfev=10000)
+    return popt_exponential
 
 def ransac_poly_fit(x, y, degree):
     model = make_pipeline(PolynomialFeatures(degree=degree), RANSACRegressor())
@@ -46,11 +64,9 @@ def calculate_r2(model, x_data, y_data):
     predictions = model.predict(x_data)
     return r2_score(y_data, predictions)
 
-def calculate_adjusted_r_squared(model, x_data, y_data, num_predictors):
-    r2 = calculate_r2(model, x_data, y_data)
-    n = len(y_data)  # Anzahl der Beobachtungen
-    adj_r2 = 1 - (1 - r2) * (n - 1) / (n - num_predictors - 1)
-    return adj_r2
+def calculate_adjusted_r2(r_squared, num_obs, num_predictors):
+    adjusted_r2 = 1 - (1 - r_squared) * (num_obs - 1) / (num_obs - num_predictors - 1)
+    return adjusted_r2
 
 # Sinus- und Cosinus-Transformationen
 def sinus_cosinus_transform(x):
@@ -72,12 +88,12 @@ def sinus_transform(x):
 def cosinus_transform(x):
     return np.cos(x)
 
-def calculate_adjusted_r_squared(model, x_data, y_data, num_predictors):
-    predictions = model.predict(x_data)
-    r2 = r2_score(y_data, predictions)
-    n = len(y_data)  # Anzahl der Beobachtungen
-    adj_r2 = 1 - (1 - r2) * (n - 1) / (n - num_predictors - 1)
-    return adj_r2
+def calculate_adjusted_r_squared(y_true, y_pred, num_predictors):
+    n = len(y_true)
+    r_squared = r2_score(y_true, y_pred)
+    adjusted_r_squared = 1 - (1 - r_squared) * (n - 1) / (n - num_predictors - 1)
+    return adjusted_r_squared
+
 
 
 def create_ransac_pipeline(func, degree=1, transformer=None):
@@ -271,148 +287,8 @@ def cluster_hdbscan(selected_rows):
         
         continue # Nächste Benutzerinteraktion lesen
 
+#robustes fitting
 """
-# Standard plotall
-def plotall(selected_rows):
-    property_list = ['magnetization', 'wall_thickness'] 
-    configuration = ['Europe', 'Australia', 'Africa', 'America', 'Africa']
-    instruments = ['Dolphin', 'Pufferfish', 'Unicorn', 'Dog', 'Elephant']
-    instruments = ['Dolphin']
-    configuration = ['Africa']
-    # Anzahl der Subplots bestimmen
-    num_configs = len(configuration)
-    num_instrs = len(instruments)
-    fig, axs = plt.subplots(num_configs, num_instrs, figsize=(5*num_instrs, 5*num_configs))
-    for i, conf in enumerate(configuration):
-        for j, instr in enumerate(instruments):
-            df = pd.DataFrame(columns=['data_id', 'center'])
-            df = get_cluster_center(instr, conf)
-            print(df)
-            x_data = []
-            y_data = []
-
-            for coord in df:
-                if len(coord) == 2:  # Stelle sicher, dass es sich um ein Koordinatenpaar handelt
-                    x_data.append(coord[0])
-                    y_data.append(coord[1])
-
-            # Überprüfe, ob Daten vorhanden sind
-            if x_data and y_data:
-                x_data = np.array(x_data).ravel().astype(float)
-                y_data = np.array(y_data).ravel().astype(float)        
-
-            popt_parabel, _ = curve_fit(parabel, x_data, y_data)
-            popt_kubisch, _ = curve_fit(kubisch, x_data, y_data, maxfev=10000)
-            popt_abs, _ = curve_fit(abs_value, x_data, y_data, maxfev=10000)
-            popt_sinus, _ = curve_fit(sinus, x_data, y_data)
-            popt_linear, _ = curve_fit(linear, x_data, y_data)
-
-            # Angepasste Funktionen berechnen
-            y_parabel_fit = parabel(x_data, *popt_parabel)
-            y_kubisch_fit = kubisch(x_data, *popt_kubisch)
-            y_abs_fit = abs_value(x_data, *popt_abs)
-            y_sinus_fit = sinus(x_data, *popt_sinus)
-            y_linear_fit = linear(x_data, *popt_linear)
-            
-            # Formatierung der Gleichungen für alle Fits
-            poly_eq = f'{popt_parabel[0]:.2f} * x^2 + {popt_parabel[1]:.2f} * x + {popt_parabel[2]:.2f}'
-            sinus_eq = f'{popt_sinus[0]:.2f} * sin({popt_sinus[1]:.2f} * x + {popt_sinus[2]:.2f})'
-            kubisch_eq = f'{popt_kubisch[0]:.2f} * x^3 + {popt_kubisch[1]:.2f} * x^2 + {popt_kubisch[2]:.2f} * x + {popt_kubisch[3]:.2f}'
-            abs_eq = f'{popt_abs[0]:.2f} * abs(x) + {popt_abs[1]:.2f} * x + {popt_abs[2]:.2f}'
-            linear_eq = f'{popt_linear[0]:.2f} * x + {popt_linear[1]:.2f}'
-
-            # Erstellen deines Plots
-            fig, ax = plt.subplots()
-            plt.scatter(x_data, y_data, label='Originaldaten')
-            plt.plot(x_data, y_parabel_fit, label='Parabel-Fit', color='red')
-            plt.plot(x_data, y_sinus_fit, label='Sinus-Fit', color='green')
-            plt.plot(x_data, y_kubisch_fit, label='Kubisch-Fit', color='orange')
-            plt.plot(x_data, y_abs_fit, label='Absolutwert-Fit', color='yellow')
-            plt.plot(x_data, y_linear_fit, label='Linear-Fit', color='purple')
-
-            # Füge die Gleichungen zum Plot hinzu
-            plt.legend()
-            fig.text(0.05, 0.02, f'Parabel: {poly_eq}', fontsize=10)
-            fig.text(0.05, 0.01, f'Sinus: {sinus_eq}', fontsize=10)
-            fig.text(0.95, 0.02, f'Kubisch: {kubisch_eq}', fontsize=10, ha='right')
-            fig.text(0.95, 0.01, f'Absolutwert: {abs_eq}', fontsize=10, ha='right')
-            fig.text(0.95, 0.00, f'Linear: {linear_eq}', fontsize=10, ha='right')
-
-            plt.xlabel('x')
-            plt.ylabel('y')
-            plt.title('Vergleich verschiedener Fits')          
-    plt.show()
-    """
-"""
-def plotall(selected_rows):
-
-
-    df = pd.DataFrame(columns=['data_id', 'center'])
-    for data_id in selected_rows:  # Für jede ausgewählte Zeile
-        temp_data = get_cluster_center_from_selectedrows(data_id)
-        # Überprüfe, ob temp_data ein DataFrame ist, und konvertiere, falls nötig
-        if isinstance(temp_data, list):
-            temp_df = pd.DataFrame(temp_data, columns=['x_coord', 'y_coord'])
-        else:
-            temp_df = temp_data
-        df = pd.concat([df, temp_df], ignore_index=True)
-
-    x_data = df['x_coord'].tolist()
-    y_data = df['y_coord'].tolist()
-
-    for coord in df:
-        if len(coord) == 2:  # Stelle sicher, dass es sich um ein Koordinatenpaar handelt
-            x_data.append(coord[0])
-            y_data.append(coord[1])
-
-    # Überprüfe, ob Daten vorhanden sind
-    if x_data and y_data:
-        x_data = np.array(x_data).ravel().astype(float)
-        y_data = np.array(y_data).ravel().astype(float)        
-
-    popt_parabel, _ = curve_fit(parabel, x_data, y_data)
-    popt_kubisch, _ = curve_fit(kubisch, x_data, y_data, maxfev=10000)
-    popt_abs, _ = curve_fit(abs_value, x_data, y_data, maxfev=10000)
-    popt_sinus, _ = curve_fit(sinus, x_data, y_data)
-    popt_linear, _ = curve_fit(linear, x_data, y_data)
-
-    # Angepasste Funktionen berechnen
-    y_parabel_fit = parabel(x_data, *popt_parabel)
-    y_kubisch_fit = kubisch(x_data, *popt_kubisch)
-    y_abs_fit = abs_value(x_data, *popt_abs)
-    y_sinus_fit = sinus(x_data, *popt_sinus)
-    y_linear_fit = linear(x_data, *popt_linear)
-    
-    # Formatierung der Gleichungen für alle Fits
-    poly_eq = f'{popt_parabel[0]:.2f} * x^2 + {popt_parabel[1]:.2f} * x + {popt_parabel[2]:.2f}'
-    sinus_eq = f'{popt_sinus[0]:.2f} * sin({popt_sinus[1]:.2f} * x + {popt_sinus[2]:.2f})'
-    kubisch_eq = f'{popt_kubisch[0]:.2f} * x^3 + {popt_kubisch[1]:.2f} * x^2 + {popt_kubisch[2]:.2f} * x + {popt_kubisch[3]:.2f}'
-    abs_eq = f'{popt_abs[0]:.2f} * abs(x) + {popt_abs[1]:.2f} * x + {popt_abs[2]:.2f}'
-    linear_eq = f'{popt_linear[0]:.2f} * x + {popt_linear[1]:.2f}'
-
-    # Erstellen deines Plots
-    fig, ax = plt.subplots()
-    plt.scatter(x_data, y_data, label='Originaldaten')
-    plt.plot(x_data, y_parabel_fit, label='Parabel-Fit', color='red')
-    plt.plot(x_data, y_sinus_fit, label='Sinus-Fit', color='green')
-    plt.plot(x_data, y_kubisch_fit, label='Kubisch-Fit', color='orange')
-    plt.plot(x_data, y_abs_fit, label='Absolutwert-Fit', color='yellow')
-    plt.plot(x_data, y_linear_fit, label='Linear-Fit', color='purple')
-
-    # Füge die Gleichungen zum Plot hinzu
-    plt.legend()
-    fig.text(0.05, 0.02, f'Parabel: {poly_eq}', fontsize=10)
-    fig.text(0.05, 0.01, f'Sinus: {sinus_eq}', fontsize=10)
-    fig.text(0.95, 0.02, f'Kubisch: {kubisch_eq}', fontsize=10, ha='right')
-    fig.text(0.95, 0.01, f'Absolutwert: {abs_eq}', fontsize=10, ha='right')
-    fig.text(0.95, 0.00, f'Linear: {linear_eq}', fontsize=10, ha='right')
-
-    plt.xlabel('x')
-    plt.ylabel('y')
-    plt.title('Vergleich verschiedener Fits')
-    plt.show()
-"""
-
 def plotall(selected_rows):
     df = pd.DataFrame(columns=['data_id', 'center'])
     for data_id in selected_rows:
@@ -423,9 +299,51 @@ def plotall(selected_rows):
             temp_df = temp_data
         df = pd.concat([df, temp_df], ignore_index=True)
         
-    df = df.sort_values(by='x_coord', ascending=True)   
+    df = df.sort_values(by='x_coord', ascending=True)
     x_data = np.array(df['x_coord'].tolist()).reshape(-1, 1)
     y_data = np.array(df['y_coord'].tolist())
+
+    combined_array = np.column_stack((x_data, y_data))
+    n_clusters = 1
+
+    kmeans = KMeans(n_clusters=n_clusters, random_state=0).fit(combined_array)
+    cluster_labels = kmeans.labels_
+
+    # Berechne die Distanzen zu den Clusterzentren
+    centroids = kmeans.cluster_centers_
+    distances = pairwise_distances(combined_array, centroids[cluster_labels], metric='euclidean')
+    distances = np.min(distances, axis=1)  # Wähle die minimale Distanz für jeden Punkt
+
+    # Bestimme den Schwellenwert anhand eines Prozentsatzes
+    percentile = 95  # Zum Beispiel die 95. Perzentile
+    threshold = np.percentile(distances, percentile)
+
+    # Ausgabe des Schwellenwerts
+    print(f"Schwellenwert für die {percentile}. Perzentile: {threshold}")
+
+    # Optional: Identifiziere und entferne Ausreißer
+    inliers = distances < threshold
+    clustered_data_x = np.array(x_data[inliers]).reshape(-1, 1)
+
+    clustered_data_y = np.array(y_data[inliers])
+
+    # Teile Datenpunkte in Cluster auf
+    clustered_data_x = [x_data_filtered[cluster_labels == i] for i in range(n_clusters)]
+    clustered_data_y = [y_data_filtered[cluster_labels == i] for i in range(n_clusters)]
+
+
+
+    clustered_data_x = [[] for _ in range(n_clusters)]
+    clustered_data_y = [[] for _ in range(n_clusters)]
+    
+    # Teile Datenpunkte in die Listen basierend auf ihren Clustern auf
+    for label, x, y in zip(cluster_labels, x_data, y_data):
+        clustered_data_x[label].append(x)
+        clustered_data_y[label].append(y)
+    clustered_data_x = np.array(clustered_data_x[0]).reshape(-1, 1)
+    clustered_data_y = np.array(clustered_data_y[0])
+
+
     model_parabel = create_ransac_pipeline(None, degree=2)
     model_kubisch = create_ransac_pipeline(None, degree=3)
     model_sinus = create_ransac_pipeline(sinus_transform, degree=1)  # Definiere sinus_transform entsprechend
@@ -434,13 +352,15 @@ def plotall(selected_rows):
     model_exponential = create_ransac_pipeline(exponential_transform, degree=1)  # Definiere exponential_transform entsprechend
 
 
+
     # Anpassen der Modelle
-    model_parabel.fit(x_data, y_data)
-    model_kubisch.fit(x_data, y_data)
-    model_sinus.fit(x_data, y_data)
-    model_cosinus.fit(x_data, y_data)
-    model_linear.fit(x_data, y_data)
-    model_exponential.fit(x_data, y_data)
+    model_parabel.fit(clustered_data_x, clustered_data_y)
+    model_kubisch.fit(clustered_data_x, clustered_data_y)
+    model_sinus.fit(clustered_data_x, clustered_data_y)
+    model_cosinus.fit(clustered_data_x, clustered_data_y)
+    model_linear.fit(clustered_data_x, clustered_data_y)
+    model_exponential.fit(clustered_data_x, clustered_data_y)
+
     
     num_predictors_parabel = 3  # a, b, c
     num_predictors_kubisch = 4  # a, b, c, d
@@ -449,20 +369,20 @@ def plotall(selected_rows):
     num_predictors_cosinus = 3  # a, b, c
     num_predictors_exponential = 2  # a, b
 
-    adj_r2_parabel = calculate_adjusted_r_squared(model_parabel, x_data, y_data, num_predictors_parabel)
-    adj_r2_kubisch = calculate_adjusted_r_squared(model_kubisch, x_data, y_data, num_predictors_kubisch)
-    adj_r2_sinus = calculate_adjusted_r_squared(model_sinus, x_data, y_data, num_predictors_sinus)
-    adj_r2_linear = calculate_adjusted_r_squared(model_linear, x_data, y_data, num_predictors_linear)
-    adj_r2_cosinus = calculate_adjusted_r_squared(model_cosinus, x_data, y_data, num_predictors_cosinus)
-    adj_r2_exponential = calculate_adjusted_r_squared(model_exponential, x_data, y_data, num_predictors_exponential)
+    adj_r2_parabel = calculate_adjusted_r_squared(model_parabel, clustered_data_x, clustered_data_y, num_predictors_parabel)
+    adj_r2_kubisch = calculate_adjusted_r_squared(model_kubisch, clustered_data_x, clustered_data_y, num_predictors_kubisch)
+    adj_r2_sinus = calculate_adjusted_r_squared(model_sinus, clustered_data_x, clustered_data_y, num_predictors_sinus)
+    adj_r2_linear = calculate_adjusted_r_squared(model_linear, clustered_data_x, clustered_data_y, num_predictors_linear)
+    adj_r2_cosinus = calculate_adjusted_r_squared(model_cosinus, clustered_data_x, clustered_data_y, num_predictors_cosinus)
+    adj_r2_exponential = calculate_adjusted_r_squared(model_exponential, clustered_data_x, clustered_data_y, num_predictors_exponential)
 
     r2_values = {
-    'Parabel': calculate_adjusted_r_squared(model_parabel, x_data, y_data, num_predictors_parabel),
-    'Kubisch': calculate_adjusted_r_squared(model_kubisch, x_data, y_data, num_predictors_kubisch),
-    'Sinus': calculate_adjusted_r_squared(model_sinus, x_data, y_data, num_predictors_sinus),
-    'Linear': calculate_adjusted_r_squared(model_linear, x_data, y_data, num_predictors_linear),
-    'Cosinus': calculate_adjusted_r_squared(model_cosinus, x_data, y_data, num_predictors_cosinus),
-    'Exponential': calculate_adjusted_r_squared(model_exponential, x_data, y_data, num_predictors_exponential)
+    'Parabel': calculate_adjusted_r_squared(model_parabel, clustered_data_x, clustered_data_y, num_predictors_parabel),
+    'Kubisch': calculate_adjusted_r_squared(model_kubisch, clustered_data_x, clustered_data_y, num_predictors_kubisch),
+    'Sinus': calculate_adjusted_r_squared(model_sinus, clustered_data_x, clustered_data_y, num_predictors_sinus),
+    'Linear': calculate_adjusted_r_squared(model_linear, clustered_data_x, clustered_data_y, num_predictors_linear),
+    'Cosinus': calculate_adjusted_r_squared(model_cosinus, clustered_data_x, clustered_data_y, num_predictors_cosinus),
+    'Exponential': calculate_adjusted_r_squared(model_exponential, clustered_data_x, clustered_data_y, num_predictors_exponential)
     }
     print(r2_values)
     best_two = sorted(r2_values, key=r2_values.get, reverse=True)[:2]
@@ -487,71 +407,13 @@ def plotall(selected_rows):
     # Linear
     linear_eq = f"{linear_params[1]:.2f}x + {linear_params[0]:.2f}"
 
-
-
-    #if len(x_data) > 0 and len(y_data) > 0:
-     #   fig, ax = plt.subplots()
-    """
-    popt_parabel, _ = curve_fit(parabel, x_data, y_data)
-    popt_kubisch, _ = curve_fit(kubisch, x_data, y_data, maxfev=10000)
-    popt_sinus, _ = curve_fit(sinus, x_data, y_data)
-    popt_linear, _ = curve_fit(linear, x_data, y_data)
-    popt_cosinus, _ = curve_fit(cosinus, x_data, y_data)
-    popt_exponential, _ = curve_fit(exponential, x_data, y_data)
-
-    # Angepasste Funktionen berechnen
-    y_parabel_fit = parabel(x_data, *popt_parabel)
-    y_kubisch_fit = kubisch(x_data, *popt_kubisch)
-    y_sinus_fit = sinus(x_data, *popt_sinus)
-    y_linear_fit = linear(x_data, *popt_linear)
-    y_cosinus_fit = cosinus(x_data, *popt_cosinus)
-    y_exponential_fit = exponential(x_data, *popt_exponential)
-    num_predictors_parabel = 3  # a, b, c
-    num_predictors_kubisch = 4  # a, b, c, d
-    num_predictors_sinus = 3  # a, b, c
-    num_predictors_linear = 2  # a, b
-    num_predictors_cosinus = 3  # a, b, c
-    num_predictors_exponential = 2  # a, b
-
-    # Berechnung des angepassten R-Quadrat für jede Funktion
-    adj_r2_parabel = calculate_adjusted_r_squared(y_parabel_fit, x_data, y_data, num_predictors_parabel)
-    adj_r2_kubisch = calculate_adjusted_r_squared(y_kubisch_fit, x_data, y_data, num_predictors_kubisch)
-    adj_r2_sinus = calculate_adjusted_r_squared(y_sinus_fit, x_data, y_data, num_predictors_sinus)
-    adj_r2_linear = calculate_adjusted_r_squared(y_linear_fit, x_data, y_data, num_predictors_linear)
-    adj_r2_cosinus = calculate_adjusted_r_squared(y_cosinus_fit, x_data, y_data, num_predictors_cosinus)
-    adj_r2_exponential = calculate_adjusted_r_squared(y_exponential_fit, x_data, y_data, num_predictors_exponential)
-
-    #Print the adjusted R-squared values
-    print("Adjusted R-squared for Parabel: ", adj_r2_parabel)
-    print("Adjusted R-squared for Kubisch: ", adj_r2_kubisch)
-    print("Adjusted R-squared for Linear: ", adj_r2_linear)
-    print("Adjusted R-squared for Sinus: ", adj_r2_sinus)
-    print("Adjusted R-squared for Cosinus: ", adj_r2_cosinus)
-    print("Adjusted R-squared for Exponential: ", adj_r2_exponential)
-
-    
-    # Formatierung der Gleichungen für alle Fits
-    poly_eq = f'{popt_parabel[0]:.2f} * x^2 + {popt_parabel[1]:.2f} * x + {popt_parabel[2]:.2f}'
-    sinus_eq = f'{popt_sinus[0]:.2f} * sin({popt_sinus[1]:.2f} * x + {popt_sinus[2]:.2f})'
-    kubisch_eq = f'{popt_kubisch[0]:.2f} * x^3 + {popt_kubisch[1]:.2f} * x^2 + {popt_kubisch[2]:.2f} * x + {popt_kubisch[3]:.2f}'
-    linear_eq = f'{popt_linear[0]:.2f} * x + {popt_linear[1]:.2f}'
-    cosinus_eq = f'{popt_cosinus[0]:.2f} * cos({popt_cosinus[1]:.2f} * x + {popt_cosinus[2]:.2f})'
-    exp_eq = f'{popt_exponential[0]:.2f} * exp({popt_exponential[1]:.2f} * x)'  
-    # Erstellen deines Plots
-    """
     fig, ax = plt.subplots()
     #plt.scatter(x_data, y_data, label='Originaldaten')
-    plt.scatter(df['x_coord'], df['y_coord'], label='Originaldaten')
-    """
-    plt.plot(x_data, y_parabel_fit, label='Parabel-Fit', color='red')
-    plt.plot(x_data, y_sinus_fit, label='Sinus-Fit', color='green')
-    plt.plot(x_data, y_kubisch_fit, label='Kubisch-Fit', color='orange')
-    plt.plot(x_data, y_linear_fit, label='Linear-Fit', color='purple')
-    plt.plot(x_data, y_cosinus_fit, label='Cosinus-Fit', color='blue')
-    plt.plot(x_data, y_exponential_fit, label='Exponential-Fit', color='magenta')
-    """
+    #plt.scatter(df['x_coord'], df['y_coord'], label='Originaldaten')
+    plt.scatter(clustered_data_x, clustered_data_y, label='clustering', color='red')
 
-    x_range = np.linspace(x_data.min(), x_data.max(), 100).reshape(-1, 1)
+
+    x_range = np.linspace(clustered_data_x.min(), clustered_data_x.max(), 100).reshape(-1, 1)
     if 'Parabel' in best_two:
         plt.plot(x_range, model_parabel.predict(x_range), label='Beste Parabel-Fit', color='red')
     if 'Kubisch' in best_two:
@@ -565,18 +427,208 @@ def plotall(selected_rows):
     if 'Exponential' in best_two:
         plt.plot(x_range, model_exponential.predict(x_range), label='Beste Exponential-Fit', color='magenta')
 
-
-    """
-        # Füge die Gleichungen zum Plot hinzu
+    plt.xlabel('Magnetization')
+    plt.ylabel('Wall Thickness')
     plt.legend()
-    fig.text(0.05, 0.02, f'Parabel: {poly_eq}', fontsize=10)
-    fig.text(0.05, 0.01, f'Sinus: {sinus_eq}', fontsize=10)
-    fig.text(0.95, 0.02, f'Kubisch: {kubisch_eq}', fontsize=10, ha='right')
-    fig.text(0.95, 0.00, f'Linear: {linear_eq}', fontsize=10, ha='right')
-    fig.text(0.95, -0.05, f'Cosinus: {cosinus_eq}', fontsize=10, ha='right')
-    fig.text(0.95, -0.10, f'Exponential: {exp_eq}', fontsize=10, ha='right')
+    plt.show()
+"""
 
+def calculate_frequency(x, y):
+    # Anwendung der Fast Fourier Transformation auf die Daten
+    y_fft = rfft(y)
+    x_fft = rfftfreq(n=x.size, d=(x.max()-x.min())/x.size)
+    
+    # Finden der Frequenz mit der maximalen Amplitude im Spektrum
+    idx = np.argmax(np.abs(y_fft))
+    frequency = x_fft[idx]
+    return frequency
+
+def plotall(selected_rows):
+    df = pd.DataFrame(columns=['data_id', 'center'])
+    for data_id in selected_rows:
+        temp_data = get_cluster_center_from_selectedrows(data_id)
+        if isinstance(temp_data, list):
+            temp_df = pd.DataFrame(temp_data, columns=['y_coord', 'x_coord'])
+        else:
+            temp_df = temp_data
+        df = pd.concat([df, temp_df], ignore_index=True)
+        
+    df = df.sort_values(by='x_coord', ascending=True)
+    x_data = np.array(df['x_coord'].tolist())
+    y_data = np.array(df['y_coord'].tolist())
+
+    combined_array = np.column_stack((x_data, y_data))
     """
+    n_clusters = 1
+
+    kmeans = KMeans(n_clusters=n_clusters, random_state=0).fit(combined_array)
+    cluster_labels = kmeans.labels_
+
+    # Berechne die Distanzen zu den Clusterzentren
+    centroids = kmeans.cluster_centers_
+    distances = pairwise_distances(combined_array, centroids[cluster_labels], metric='euclidean')
+    distances = np.min(distances, axis=1)  # Wähle die minimale Distanz für jeden Punkt
+
+    # Bestimme den Schwellenwert anhand eines Prozentsatzes
+    percentile = 90  # Zum Beispiel die 95. Perzentile
+    threshold = np.percentile(distances, percentile)
+    
+    # Ausgabe des Schwellenwerts
+    print(f"Schwellenwert für die {percentile}. Perzentile: {threshold}")
+
+    # Optional: Identifiziere und entferne Ausreißer
+    inliers = distances < threshold
+    """
+
+    dbscan = DBSCAN(eps=2, min_samples=5).fit(combined_array)
+
+    # Erhalte die Cluster-Labels
+    cluster_labels = dbscan.labels_
+
+    # Identifiziere die Kernpunkte
+    core_samples_mask = np.zeros_like(dbscan.labels_, dtype=bool)
+    core_samples_mask[dbscan.core_sample_indices_] = True
+
+    # Ausgabe der Anzahl der gefundenen Cluster (ohne Rauschen berücksichtigt)
+    n_clusters_ = len(set(cluster_labels)) - (1 if -1 in cluster_labels else 0)
+    print(f'Geschätzte Anzahl der Cluster: {n_clusters_}')
+
+    # Optional: Identifiziere und entferne Ausreißer
+    # Punkte mit dem Label -1 sind Ausreißer
+    inliers = cluster_labels != -1
+    
+    clustered_data_x = np.array(x_data[inliers])
+    clustered_data_y = np.array(y_data[inliers])
+    mask = ~np.isnan(clustered_data_x) & ~np.isnan(clustered_data_y) & ~np.isinf(clustered_data_x) & ~np.isinf(clustered_data_y)
+    
+    cleaned_data_x = clustered_data_x[mask]
+    cleaned_data_y = clustered_data_y[mask]
+    periods = np.diff(np.where(np.diff(np.signbit(cleaned_data_y)))[0])
+    calculated_frequency = calculate_frequency(cleaned_data_x, cleaned_data_y)
+    initial_guess_sinus = [np.ptp(cleaned_data_y) / 2, calculated_frequency, 0, np.mean(cleaned_data_y)]
+    params_sinus, params_covariance_sinus = curve_fit(sinus, cleaned_data_x, cleaned_data_y, p0=initial_guess_sinus, maxfev=10000)
+    B = params_sinus[1]
+    exclude_zone = 0.01  # Bereich, der um Null ausgeschlossen werden soll
+    if -exclude_zone < B < exclude_zone:
+        B = exclude_zone if B >= 0 else -exclude_zone
+        params_sinus[1] = B
+    x_values_for_plot = np.linspace(cleaned_data_x.min(), cleaned_data_x.max(), 500)
+    predicted_values_sinus = sinus(x_values_for_plot, *params_sinus)
+
+
+    bounds = ([-np.inf, -np.inf, -np.inf], [np.inf, np.inf, np.inf])
+    popt_parabel, _ = curve_fit(parabel, clustered_data_x, clustered_data_y, bounds=bounds, maxfev=10000)
+    popt_kubisch, _ = curve_fit(kubisch, clustered_data_x, clustered_data_y)
+    
+    x0, x1 = clustered_data_x[0], clustered_data_x[-1]
+    y0, y1 = clustered_data_y[0], clustered_data_y[-1]
+    a_initial = (y1 - y0) / (x1 - x0)
+    b_initial = y0 - a_initial * x0
+    popt_linear, _ = curve_fit(linear, clustered_data_x, clustered_data_y, p0=[a_initial, b_initial])
+    bounds = ([-150, -np.inf, -np.inf], [150, np.inf, np.inf])
+    popt_exponential, pcov_exponential = curve_fit(exponential, clustered_data_x, clustered_data_y, bounds=bounds, maxfev=10000)
+    a = popt_exponential[0]
+    if -exclude_zone < a < exclude_zone:
+        # Setzen Sie 'a' auf den Rand des ausgeschlossenen Bereichs, abhängig von seinem Vorzeichen
+        a = exclude_zone if a >= 0 else -exclude_zone
+        popt_exponential[0] = a
+    
+    a_initial = 0.01  # Ein kleiner Wert für die Krümmung
+    x0, x1 = clustered_data_x[0], clustered_data_x[-1]
+    y0, y1 = clustered_data_y[0], clustered_data_y[-1]
+    b_initial = (y1 - y0) / (x1 - x0)  # Ähnlich einer linearen Regression
+    c_initial = np.mean(clustered_data_y)  # Der Durchschnittswert der y-Daten
+
+    # Überprüfen und Anpassen des Wertes von 'a' und 'b', falls notwendig
+    a = popt_parabel[0]
+    if -exclude_zone < a < exclude_zone:
+        a = exclude_zone if a >= 0 else -exclude_zone
+        popt_parabel[0] = a
+    y_pred_parabel = parabel(clustered_data_x, *popt_parabel)
+    a = popt_kubisch[0]
+    if -exclude_zone < a < exclude_zone:
+        a = exclude_zone if a >= 0 else -exclude_zone
+        popt_kubisch[0] = a
+    y_pred_kubisch = kubisch(clustered_data_x, *popt_kubisch)
+    y_pred_linear = linear(clustered_data_x, *popt_linear)  
+    a = popt_exponential[0]
+    b = popt_exponential[1]
+    if -exclude_zone < a < exclude_zone:
+        a = exclude_zone if a >= 0 else -exclude_zone
+        popt_exponential[0] = a
+    if -exclude_zone < b < exclude_zone:
+        b = exclude_zone if b >= 0 else -exclude_zone
+        popt_exponential[1] = b
+    y_pred_exponential = exponential(clustered_data_x, *popt_exponential)
+    
+    num_obs = len(clustered_data_y)
+    num_predictors_parabel = 2  # Für eine Parabel (quadratisches Modell)
+    num_predictors_kubisch = 3  # Für ein kubisches Modell
+    num_predictors_sinus = 4    # Für ein Sinusmodell, angenommen 4 Parameter: Amplitude, Frequenz, Phase, Offset
+    num_predictors_linear = 1   # Für ein lineares Modell
+    num_predictors_exponential = 2  # Für ein exponentielles Modell
+
+    r2_parabel = r2_score(clustered_data_y, y_pred_parabel)
+    r2_kubisch = r2_score(clustered_data_y, y_pred_kubisch) 
+    r2_sinus = r2_score(cleaned_data_y, sinus(cleaned_data_x, *params_sinus))
+    r2_linear = r2_score(clustered_data_y, y_pred_linear)
+    r2_exponential = r2_score(clustered_data_y, y_pred_exponential)
+    # Speichern der adjustierten R^2-Werte
+    adj_r2_parabel = calculate_adjusted_r2(r2_parabel, num_obs, num_predictors_parabel)
+    adj_r2_kubisch = calculate_adjusted_r2(r2_kubisch, num_obs, num_predictors_kubisch)
+    adj_r2_sinus = calculate_adjusted_r2(r2_sinus, num_obs, num_predictors_sinus)
+    adj_r2_linear = calculate_adjusted_r2(r2_linear, num_obs, num_predictors_linear)
+    adj_r2_exponential = calculate_adjusted_r2(r2_exponential, num_obs, num_predictors_exponential)
+
+    r2_values = {
+        'Parabel': adj_r2_parabel,
+        'Kubisch': adj_r2_kubisch,
+        'Sinus': adj_r2_sinus,
+        'Linear': adj_r2_linear,
+        'Exponential': adj_r2_exponential
+}
+    best_two = sorted(r2_values, key=r2_values.get, reverse=True)[:2]
+
+
+    fig, ax = plt.subplots()
+    plt.scatter(clustered_data_x, clustered_data_y, label='Originaldaten')
+
+    # Plotte nur die besten zwei Modelle und zeige die angepassten R²-Werte und Funktionsgleichungen
+    for model in best_two:
+        if model == 'Parabel':
+            plt.plot(clustered_data_x, parabel(clustered_data_x, *popt_parabel), label='Beste Parabel-Fit', color='red')
+            eq = f'{popt_parabel[0]:.2f} * x^2 + {popt_parabel[1]:.2f} * x + {popt_parabel[2]:.2f}'
+            plt.text(0.95, 0.95, f'Parabel: y = {eq}\nAdj. R² = {adj_r2_parabel:.2f}', 
+                    ha='right', va='top', transform=ax.transAxes, color='red')
+        elif model == 'Kubisch':
+            plt.plot(clustered_data_x, kubisch(clustered_data_x, *popt_kubisch), label='Beste Kubisch-Fit', color='orange')
+            eq = f'{popt_kubisch[0]:.2f} * x^3 + {popt_kubisch[1]:.2f} * x^2 + {popt_kubisch[2]:.2f} * x + {popt_kubisch[3]:.2f}'
+            plt.text(0.95, 0.85, f'Kubisch: y = {eq}\nAdj. R² = {adj_r2_kubisch:.2f}', 
+                    ha='right', va='top', transform=ax.transAxes, color='orange')
+        elif model == 'Sinus':
+            plt.plot(x_values_for_plot, predicted_values_sinus, label='Fitted Sinus Curve', color='green')
+            amplitude, frequency, phase, offset = params_sinus
+            eq = f'y = {amplitude:.2f} * sin({frequency:.2f} * x + {phase:.2f}) + {offset:.2f}'
+            plt.text(0.95, 0.75, f'Sinus: y = {eq}\nAdj. R² = {adj_r2_sinus:.2f}', 
+                    ha='right', va='top', transform=ax.transAxes, color='green')
+        elif model == 'Linear':
+            plt.plot(clustered_data_x, linear(clustered_data_x, *popt_linear), label='Beste Linear-Fit', color='purple')
+            eq = f'{popt_linear[0]:.2f} * x + {popt_linear[1]:.2f}'
+            plt.text(0.95, 0.55, f'Linear: y = {eq}\n Adj. R² = {adj_r2_linear:.2f}', 
+                    ha='right', va='top', transform=ax.transAxes, color='purple')
+        elif model == 'Exponential':
+            plt.plot(clustered_data_x, exponential(clustered_data_x, *popt_exponential), label='Beste Exponential-Fit', color='magenta')
+            eq = f'{popt_exponential[0]:.2f} * exp({popt_exponential[1]:.2f} * x)'
+            plt.text(0.95, 0.45, f'Exponential: y = {eq}\nAdj. R² = {adj_r2_exponential:.2f}', 
+                    ha='right', va='top', transform=ax.transAxes, color='magenta')
+    
+    print("Adjusted R-squared for Parabel: ", adj_r2_parabel,"; ", "Parabel :",f'{popt_parabel[0]:.2f} * x^2 + {popt_parabel[1]:.2f} * x + {popt_parabel[2]:.2f}')
+    print("Adjusted R-squared for Kubisch: ", adj_r2_kubisch,"; ", "Kubisch :",f'{popt_kubisch[0]:.2f} * x^3 + {popt_kubisch[1]:.2f} * x^2 + {popt_kubisch[2]:.2f} * x + {popt_kubisch[3]:.2f}')
+    amplitude, frequency, phase, offset = params_sinus
+    print("Adjusted R-squared for Sinus: ", adj_r2_sinus,"; " "Sinus :",f'y = {amplitude:.2f} * sin({frequency:.2f} * x + {phase:.2f}) + {offset:.2f}')
+    print("Adjusted R-squared for Linear: ", adj_r2_linear,"; " "Linear :",f'{popt_linear[0]:.2f} * x + {popt_linear[1]:.2f}')
+    print("Adjusted R-squared for Exponential: ", adj_r2_exponential,"; " "Exponential:" f'{popt_exponential[0]:.2f} * exp({popt_exponential[1]:.2f} * x)')
+    
     plt.xlabel('Magnetization')
     plt.ylabel('Wall Thickness')
     plt.legend()

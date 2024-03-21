@@ -76,13 +76,12 @@ def convert_timestamp(timestamp, time, i):
     return timestamp, time
 
 # Funktion um die Outliers in den Datensätzen zu bereinigen
-def replace_outliers_with_median(id, key,data):
+def replace_outliers_with_median(data):
   # Quartile berechnen
     try:
         Q1 = np.percentile(data, 25)
         Q3 = np.percentile(data, 75)
     except:
-        print(id)
         return data
     # IQR ausrechnen
     IQR = Q3 - Q1
@@ -102,6 +101,7 @@ def replace_outliers_with_median(id, key,data):
         modified_data.append(val)
     return modified_data
 
+
 """ --- Funktionen, um die Magnetisierungswerte zu bereinigen ---"""
 #Applies linear regression to detrend the given data.
 def linear_regression_detrend(data):
@@ -117,7 +117,7 @@ def linear_regression_detrend(data):
         adjustement = (original_start_value_avg) + notadjusted[0]
     else:
         adjustement = original_start_value_avg - notadjusted[0]
-    return abs(y - trend + adjustement)
+    return (y - trend + adjustement)
 
 
 """ --- Funktionen, um die .h5-Dateien in .json-Dateien umzuwandeln ---"""
@@ -183,7 +183,7 @@ def convert_h5_to_json(file_path):
 
             # Datenpunkte bereinigen
             distance = convert_data_types(distance, dataset['distance'][i-1] if i!=0 else 0)
-            magnetization = abs(convert_data_types(magnetization, dataset['magnetization'][i-1] if i!=0 else 0))
+            magnetization = (convert_data_types(magnetization, dataset['magnetization'][i-1] if i!=0 else 0))
             velocity = convert_data_types(velocity, dataset['velocity'][i-1] if i!=0 else 0)
             wall_thickness = convert_data_types(wall_thickness, dataset['wall_thickness'][i-1] if i!=0 else 0)
             timestamp, time = convert_timestamp(timestamp, time, i)
@@ -210,7 +210,7 @@ def convert_h5_to_json(file_path):
             islice(zip(dataset['defect_channel'], dataset['distance'], dataset['magnetization'], dataset['timestamp'], dataset['wall_thickness']),j,None):
                 # Datenpunkte bereinigen
                 distance = convert_data_types(distance, new_json_data[i-1]['distance'] if i!=0 else 0)
-                magnetization = abs(convert_data_types(magnetization, new_json_data[i-1]['magnetization'] if i!=0 else 0))
+                magnetization = convert_data_types(magnetization, new_json_data[i-1]['magnetization'] if i!=0 else 0)
                 wall_thickness = convert_data_types(wall_thickness, new_json_data[i-1]['wall_thickness'] if i!=0 else 0)   
                 timestamp, time = convert_timestamp(timestamp, time, i)
                 # Fehlende Werte für die Geschwindigkeit berechnen
@@ -227,7 +227,7 @@ def convert_h5_to_json(file_path):
                     "punkt": i,
                     "defect_channel": defect_channel,
                     "distance": distance,
-                    "magnetization": abs(magnetization),
+                    "magnetization": (magnetization),
                     "timestamp": timestamp,
                     "velocity": velocity,
                     "wall_thickness": wall_thickness,
@@ -236,7 +236,7 @@ def convert_h5_to_json(file_path):
 
         # Bereinigen der Outliers in den Datensätzen
         for key in ['magnetization', 'velocity', 'wall_thickness']:
-            data = replace_outliers_with_median(data_id, key, data=[datapoint[key] for datapoint in new_json_data])
+            data = replace_outliers_with_median(data=[datapoint[key] for datapoint in new_json_data])
             for i, datapoint in enumerate(new_json_data):
                 datapoint[key] = data[i]
         
@@ -287,10 +287,11 @@ def prep_file(file):
 def prep_folder(folder):
     i=1          
     for file in os.listdir(folder): # Alle Dateien im Ordner durchsuchen
+        print(i)
         if i == 2000:
             print("Maximum number of files reached")
         i+=1
-        # Wenn die Datei eine .h5 Datei ist, wird die Funktion convert_h5_to_json() aufgerufen
+        # Wenn die Datei eine .h5 Datei ist, wird die Funktion convert_h5_to_json() aufgerufen 
         if file.endswith(".h5"):            
             full_file_path = os.path.join(folder, file) # Deteiverzeichnis und Dateiname zusammenfügen           
             data_id, json_data = convert_h5_to_json(full_file_path) # Die Funktion convert_h5_to_json() ausführen
